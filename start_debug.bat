@@ -1,0 +1,90 @@
+@echo off
+setlocal
+set BACKEND=%~dp0backend
+set FRONTEND=%~dp0frontend
+
+echo ========================================
+echo   TaskFlow - DEBUG MODE
+echo ========================================
+echo.
+
+set "PYTHON=py -3"
+py -3 --version >nul 2>&1
+if errorlevel 1 (
+    set "PYTHON=%LocalAppData%\Programs\Python\Python313\python.exe"
+)
+echo [Python] %PYTHON%
+
+where npm >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: npm not found.
+    pause & exit /b 1
+)
+
+%PYTHON% -m uvicorn --version >nul 2>&1
+if errorlevel 1 (
+    echo [1/2] Installing Python packages...
+    %PYTHON% -m pip install -r "%BACKEND%\requirements.txt" --quiet
+    if errorlevel 1 ( echo ERROR: pip install failed. & pause & exit /b 1 )
+    echo       Done.
+) else (
+    echo [1/2] Python packages OK
+)
+
+if not exist "%FRONTEND%\node_modules" (
+    echo [2/2] Installing Node packages...
+    pushd "%FRONTEND%" && call npm install --silent && popd
+    if errorlevel 1 ( echo ERROR: npm install failed. & pause & exit /b 1 )
+    echo       Done.
+) else (
+    echo [2/2] Node packages OK
+)
+
+echo.
+
+echo Clearing ports 59080 and 5173...
+for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":59080 "') do taskkill /F /PID %%a >nul 2>&1
+for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":5173 "') do taskkill /F /PID %%a >nul 2>&1
+timeout /t 1 /nobreak >nul
+
+echo Starting backend...
+start "TaskFlow - Backend" cmd /k "cd /d %BACKEND% && %PYTHON% -m uvicorn main:app --reload --port 59080"
+
+set tries=0
+:wait_backend
+timeout /t 1 /nobreak >nul
+curl -s http://localhost:59080/ >nul 2>&1
+if not errorlevel 1 goto backend_ready
+set /a tries+=1
+if %tries% lss 20 goto wait_backend
+echo WARNING: Backend did not respond. Check the Backend window for errors.
+goto start_frontend
+:backend_ready
+echo Backend ready.
+
+:start_frontend
+echo Starting frontend...
+start "TaskFlow - Frontend" cmd /k "cd /d %FRONTEND% && call npm run dev"
+
+set tries=0
+:wait_frontend
+timeout /t 1 /nobreak >nul
+curl -s -o nul http://localhost:5173/ >nul 2>&1
+if not errorlevel 1 goto frontend_ready
+set /a tries+=1
+if %tries% lss 20 goto wait_frontend
+echo WARNING: Frontend did not respond. Check the Frontend window for errors.
+goto open_browser
+:frontend_ready
+echo Frontend ready.
+
+:open_browser
+echo.
+echo ========================================
+echo   http://localhost:5173
+echo ========================================
+start "" "http://localhost:5173"
+echo.
+echo Backend and Frontend windows are open above.
+echo Close this window when done.
+pause

@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Project References — Design Options</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #09090b; color: #e4e4e7; }
+
+  /* ─── Nav tabs ─────────────────────────────────────────────────── */
+  .nav { display: flex; gap: 0; border-bottom: 1px solid #27272a; background: #09090b;
+         position: sticky; top: 0; z-index: 100; padding: 0 32px; }
+  .nav-tab { padding: 14px 22px; font-size: 13px; font-weight: 600; cursor: pointer;
+             color: #71717a; border-bottom: 2px solid transparent; transition: all .15s; white-space: nowrap; }
+  .nav-tab:hover { color: #a1a1aa; }
+  .nav-tab.active { color: #e4e4e7; border-bottom-color: #6366f1; }
+
+  /* ─── Page containers ──────────────────────────────────────────── */
+  .page { display: none; padding: 28px 32px; min-height: 100vh; }
+  .page.active { display: block; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+  .page-title { font-size: 20px; font-weight: 700; color: #f4f4f5; }
+  .page-sub   { font-size: 13px; color: #71717a; margin-top: 3px; }
+  .btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+                 background: #6366f1; color: #fff; font-size: 13px; font-weight: 600;
+                 border: none; border-radius: 8px; cursor: pointer; }
+  .btn-primary:hover { background: #4f46e5; }
+
+  /* ─── Option label ─────────────────────────────────────────────── */
+  .option-label { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700;
+                  text-transform: uppercase; letter-spacing: .08em; color: #6366f1;
+                  background: #6366f1/10; padding: 5px 12px; border-radius: 20px;
+                  border: 1px solid #6366f115; margin-bottom: 18px; background: rgba(99,102,241,.08); }
+
+  /* ─── Project card base ────────────────────────────────────────── */
+  .card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .proj-card { background: #18181b; border: 1px solid #27272a; border-radius: 14px;
+               padding: 20px; display: flex; flex-direction: column; gap: 16px;
+               transition: border-color .15s; position: relative; }
+  .proj-card:hover { border-color: #3f3f46; }
+  .proj-card .accent { border-left-width: 3px; border-left-style: solid; }
+
+  .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .card-name { font-size: 14px; font-weight: 600; color: #f4f4f5; }
+  .card-desc { font-size: 12px; color: #71717a; margin-top: 3px; }
+  .card-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600;
+                padding: 3px 8px; border-radius: 20px; margin-top: 5px; }
+  .badge-proj { color: #818cf8; background: rgba(99,102,241,.1); border: 1px solid rgba(99,102,241,.15); }
+  .badge-act  { color: #2dd4bf; background: rgba(20,184,166,.1); border: 1px solid rgba(20,184,166,.15); }
+  .card-actions { display: flex; gap: 2px; flex-shrink: 0; }
+  .icon-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+              background: none; border: none; border-radius: 6px; cursor: pointer; color: #52525b;
+              transition: all .15s; font-size: 13px; }
+  .icon-btn:hover { color: #a1a1aa; background: #27272a; }
+  .icon-btn.violet:hover { color: #a78bfa; background: rgba(167,139,250,.1); }
+  .icon-btn.indigo:hover { color: #818cf8; background: rgba(99,102,241,.1); }
+  .icon-btn.red:hover    { color: #f87171; background: rgba(248,113,113,.1); }
+
+  .card-stats { display: flex; gap: 16px; font-size: 12px; }
+  .card-stats .lbl { color: #71717a; } .card-stats .val { font-weight: 600; color: #e4e4e7; }
+  .card-stats .val.green { color: #34d399; } .card-stats .val.red { color: #f87171; }
+  .prog-bar { height: 6px; background: #27272a; border-radius: 99px; overflow: hidden; }
+  .prog-fill { height: 100%; border-radius: 99px; transition: width .7s; }
+  .card-btns { display: flex; gap: 8px; }
+  .btn-add  { flex: 1; padding: 7px; font-size: 12px; font-weight: 600; color: #fff;
+              border: none; border-radius: 8px; cursor: pointer; opacity: .88; }
+  .btn-add:hover { opacity: 1; }
+  .btn-view { flex: 1; padding: 7px; font-size: 12px; color: #a1a1aa; background: none;
+              border: 1px solid #27272a; border-radius: 8px; cursor: pointer; }
+  .btn-view:hover { border-color: #52525b; color: #e4e4e7; }
+
+  /* ─── OPTION A: Inline expand ──────────────────────────────────── */
+  .refs-expand { border-top: 1px solid #27272a; padding-top: 14px; margin-top: 0; }
+  .refs-expand-header { display: flex; align-items: center; justify-content: space-between;
+                         cursor: pointer; user-select: none; }
+  .refs-expand-title  { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: #71717a; }
+  .refs-expand-title svg { opacity: .6; }
+  .refs-badge-count { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 20px;
+                       background: rgba(99,102,241,.15); color: #818cf8; }
+  .refs-chevron { font-size: 10px; color: #52525b; transition: transform .2s; }
+  .refs-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .ref-item { background: #0f0f11; border: 1px solid #27272a; border-radius: 10px; padding: 11px 13px; }
+  .ref-item-top { display: flex; align-items: flex-start; gap: 8px; justify-content: space-between; }
+  .ref-type-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700;
+                   padding: 2px 7px; border-radius: 4px; flex-shrink: 0; }
+  .pill-url  { color: #818cf8; background: rgba(99,102,241,.12);  }
+  .pill-note { color: #fbbf24; background: rgba(251,191,36,.12); }
+  .pill-doc  { color: #34d399; background: rgba(52,211,153,.12); }
+  .ref-title { font-size: 13px; font-weight: 600; color: #e4e4e7; flex: 1; }
+  .ref-url-link { font-size: 11px; color: #6366f1; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+  .ref-url-link:hover { color: #818cf8; }
+  .ref-notes { font-size: 11px; color: #71717a; margin-top: 5px; line-height: 1.5;
+               background: #18181b; border-radius: 6px; padding: 6px 9px; }
+  .ref-actions { display: flex; gap: 2px; }
+  .add-ref-btn { width: 100%; padding: 8px; font-size: 12px; color: #52525b; background: none;
+                  border: 1px dashed #27272a; border-radius: 8px; cursor: pointer; margin-top: 8px;
+                  display: flex; align-items: center; justify-content: center; gap: 6px; transition: all .15s; }
+  .add-ref-btn:hover { color: #818cf8; border-color: rgba(99,102,241,.4); background: rgba(99,102,241,.04); }
+
+  /* ─── OPTION B: Split panel ────────────────────────────────────── */
+  .split-layout { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
+  .split-panel { background: #18181b; border: 1px solid #27272a; border-radius: 14px;
+                  position: sticky; top: 64px; overflow: hidden; }
+  .split-panel-header { padding: 16px 18px; border-bottom: 1px solid #27272a;
+                         display: flex; align-items: center; justify-content: space-between; }
+  .split-panel-title { font-size: 13px; font-weight: 600; color: #e4e4e7; }
+  .split-panel-sub   { font-size: 11px; color: #71717a; margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+  .split-panel-dot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .split-panel-body  { padding: 14px; max-height: calc(100vh - 160px); overflow-y: auto; }
+  .split-panel-tabs  { display: flex; padding: 10px 14px 0; gap: 4px; }
+  .split-tab { padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 6px;
+               cursor: pointer; transition: all .15s; color: #71717a; border: none; background: none; }
+  .split-tab:hover  { color: #a1a1aa; background: #27272a; }
+  .split-tab.active { color: #e4e4e7; background: #27272a; }
+  .split-empty { padding: 36px 20px; text-align: center; color: #3f3f46; }
+  .split-empty svg-icon { font-size: 28px; display: block; margin: 0 auto 8px; opacity: .4; }
+  .split-card-sm { background: #0f0f11; border: 1px solid #27272a; border-radius: 10px; overflow: hidden; }
+  .split-card-sm + .split-card-sm { margin-top: 8px; }
+  .split-card-sm-header { padding: 11px 13px; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+  .split-card-sm-header:hover { background: #18181b; }
+  .split-card-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .split-card-name { font-size: 13px; font-weight: 600; color: #e4e4e7; flex: 1; }
+  .split-card-count { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 20px;
+                       background: rgba(99,102,241,.15); color: #818cf8; }
+
+  /* ─── OPTION C: Card tabs ──────────────────────────────────────── */
+  .card-tabs { display: flex; gap: 0; border-bottom: 1px solid #27272a; margin: -4px -20px 14px; padding: 0 20px; }
+  .card-tab { padding: 8px 14px; font-size: 11px; font-weight: 600; cursor: pointer; color: #71717a;
+              border-bottom: 2px solid transparent; transition: all .15s; }
+  .card-tab:hover { color: #a1a1aa; }
+  .card-tab.active { color: #e4e4e7; border-bottom-color: #6366f1; }
+  .card-tab-content { display: none; }
+  .card-tab-content.active { display: block; }
+  .ref-mini { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0;
+              border-bottom: 1px solid #1f1f23; }
+  .ref-mini:last-child { border-bottom: none; }
+  .ref-mini-icon { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center;
+                   justify-content: center; font-size: 11px; flex-shrink: 0; }
+  .ref-mini-title { font-size: 12px; font-weight: 600; color: #d4d4d8; }
+  .ref-mini-meta  { font-size: 11px; color: #52525b; margin-top: 2px; }
+  .ref-mini-link  { font-size: 11px; color: #6366f1; margin-top: 2px; }
+  .no-refs { font-size: 12px; color: #52525b; text-align: center; padding: 20px 0; }
+
+  /* ─── SVG icons inline ─────────────────────────────────────────── */
+  svg.icon { width: 13px; height: 13px; stroke: currentColor; fill: none;
+             stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
+  svg.icon-sm { width: 11px; height: 11px; stroke: currentColor; fill: none;
+                stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ─── Misc ─────────────────────────────────────────────────────── */
+  a { text-decoration: none; }
+  .truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; display: inline-block; }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-tab active" onclick="switchTab('a')">Option A — Inline Expand</div>
+  <div class="nav-tab"       onclick="switchTab('b')">Option B — Side Panel</div>
+  <div class="nav-tab"       onclick="switchTab('c')">Option C — Card Tabs</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     OPTION A — Inline expand inside the card
+════════════════════════════════════════════════════════════════════ -->
+<div class="page active" id="page-a">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Projects</div>
+      <div class="page-sub">4 active projects</div>
+    </div>
+    <button class="btn-primary">+ New Project</button>
+  </div>
+
+  <div class="option-label">
+    Option A — Reference section expands inside the card. Click the link icon to toggle it.
+  </div>
+
+  <div class="card-grid">
+
+    <!-- Card 1 — with references, expanded -->
+    <div class="proj-card" style="border-left:3px solid #6366f1">
+      <div class="card-top">
+        <div>
+          <div class="card-name">TFLS I&amp;D</div>
+          <div class="card-desc">Infrastructure &amp; Delivery workstream</div>
+          <div class="card-badge badge-proj">
+            <svg class="icon-sm" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+            Project
+          </div>
+        </div>
+        <div class="card-actions">
+          <button class="icon-btn violet" title="Manage Tags">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          </button>
+          <button class="icon-btn indigo" title="References" onclick="toggleRefs('a1')">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </button>
+          <button class="icon-btn" title="Edit">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="icon-btn red" title="Delete">
+            <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="card-stats">
+        <div><span class="lbl">Total </span><span class="val">8</span></div>
+        <div><span class="lbl">Done </span><span class="val green">3</span></div>
+        <div><span class="lbl">Overdue </span><span class="val red">1</span></div>
+      </div>
+
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;">
+          <span style="color:#71717a">Progress</span><span style="color:#a1a1aa">38%</span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" style="width:38%;background:#6366f1"></div></div>
+      </div>
+
+      <div class="card-btns">
+        <button class="btn-add" style="background:#6366f1">+ Add Task</button>
+        <button class="btn-view">View Tasks</button>
+      </div>
+
+      <!-- References section — EXPANDED -->
+      <div class="refs-expand" id="refs-a1">
+        <div class="refs-expand-header" onclick="toggleRefs('a1')">
+          <div class="refs-expand-title">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            References
+            <span class="refs-badge-count">3</span>
+          </div>
+          <span class="refs-chevron" id="chevron-a1">▲</span>
+        </div>
+
+        <div class="refs-list" id="refs-body-a1">
+          <div class="ref-item">
+            <div class="ref-item-top">
+              <span class="ref-type-pill pill-url">
+                <svg class="icon-sm" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                URL
+              </span>
+              <span class="ref-title">SharePoint Site</span>
+              <div class="ref-actions">
+                <button class="icon-btn">
+                  <svg class="icon-sm" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="icon-btn red">
+                  <svg class="icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                </button>
+              </div>
+            </div>
+            <a class="ref-url-link" href="#">
+              <svg class="icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              sharepoint.com/sites/TFLS-ID
+            </a>
+          </div>
+
+          <div class="ref-item">
+            <div class="ref-item-top">
+              <span class="ref-type-pill pill-note">
+                <svg class="icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Note
+              </span>
+              <span class="ref-title">WBSe Codes</span>
+              <div class="ref-actions">
+                <button class="icon-btn"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                <button class="icon-btn red"><svg class="icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+              </div>
+            </div>
+            <div class="ref-notes">INFRA-0042-CD · INFRA-0043-SD<br>Use INFRA-0043 for all dev sub-tasks.</div>
+          </div>
+
+          <div class="ref-item">
+            <div class="ref-item-top">
+              <span class="ref-type-pill pill-doc">
+                <svg class="icon-sm" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                Doc
+              </span>
+              <span class="ref-title">Architecture Overview</span>
+              <div class="ref-actions">
+                <button class="icon-btn"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                <button class="icon-btn red"><svg class="icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+              </div>
+            </div>
+            <a class="ref-url-link" href="#">
+              <svg class="icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              confluence.company.com/arch-overview
+            </a>
+          </div>
+
+          <button class="add-ref-btn">
+            <svg class="icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add reference
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2 — collapsed (just the toggle header) -->
+    <div class="proj-card" style="border-left:3px solid #10b981">
+      <div class="card-top">
+        <div>
+          <div class="card-name">DailyATR / Buddy</div>
+          <div class="card-desc">Automated daily reporting</div>
+          <div class="card-badge badge-act">
+            <svg class="icon-sm" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+            Ongoing
+          </div>
+        </div>
+        <div class="card-actions">
+          <button class="icon-btn violet" title="Tags"><svg class="icon" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></button>
+          <button class="icon-btn indigo" title="References" onclick="toggleRefs('a2')"><svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
+          <button class="icon-btn"><svg class="icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="icon-btn red"><svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+        </div>
+      </div>
+      <div class="card-stats">
+        <div><span class="lbl">Total </span><span class="val">5</span></div>
+        <div><span class="lbl">Done </span><span class="val green">5</span></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(45,212,191,.6)">
+        <svg class="icon-sm" style="color:rgba(45,212,191,.6)" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+        Ongoing — no completion target
+      </div>
+      <div class="card-btns">
+        <button class="btn-add" style="background:#10b981">+ Add Task</button>
+        <button class="btn-view">View Tasks</button>
+      </div>
+
+      <!-- References section — COLLAPSED -->
+      <div class="refs-expand" id="refs-a2">
+        <div class="refs-expand-header" onclick="toggleRefs('a2')">
+          <div class="refs-expand-title">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            References
+            <span class="refs-badge-count">1</span>
+          </div>
+          <span class="refs-chevron" id="chevron-a2" style="transform:rotate(180deg)">▲</span>
+        </div>
+        <div class="refs-list" id="refs-body-a2" style="display:none">
+          <div class="ref-item">
+            <div class="ref-item-top">
+              <span class="ref-type-pill pill-url"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>URL</span>
+              <span class="ref-title">ATR Dashboard</span>
+              <div class="ref-actions">
+                <button class="icon-btn"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                <button class="icon-btn red"><svg class="icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <button class="add-ref-btn"><svg class="icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add reference</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3 — no references yet -->
+    <div class="proj-card" style="border-left:3px solid #f59e0b">
+      <div class="card-top">
+        <div>
+          <div class="card-name">Todo App</div>
+          <div class="card-desc">Personal task manager project</div>
+          <div class="card-badge badge-proj"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Project</div>
+        </div>
+        <div class="card-actions">
+          <button class="icon-btn violet"><svg class="icon" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></button>
+          <button class="icon-btn indigo" onclick="toggleRefs('a3')"><svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
+          <button class="icon-btn"><svg class="icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="icon-btn red"><svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+        </div>
+      </div>
+      <div class="card-stats"><div><span class="lbl">Total </span><span class="val">12</span></div><div><span class="lbl">Done </span><span class="val green">7</span></div></div>
+      <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;"><span style="color:#71717a">Progress</span><span style="color:#a1a1aa">58%</span></div><div class="prog-bar"><div class="prog-fill" style="width:58%;background:#f59e0b"></div></div></div>
+      <div class="card-btns"><button class="btn-add" style="background:#f59e0b">+ Add Task</button><button class="btn-view">View Tasks</button></div>
+
+      <!-- References — empty state -->
+      <div class="refs-expand" id="refs-a3">
+        <div class="refs-expand-header" onclick="toggleRefs('a3')">
+          <div class="refs-expand-title">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            References
+          </div>
+          <span class="refs-chevron" id="chevron-a3" style="transform:rotate(180deg)">▲</span>
+        </div>
+        <div class="refs-list" id="refs-body-a3" style="display:none">
+          <button class="add-ref-btn"><svg class="icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add first reference</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     OPTION B — Sticky side panel
+════════════════════════════════════════════════════════════════════ -->
+<div class="page" id="page-b">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Projects</div>
+      <div class="page-sub">4 active projects</div>
+    </div>
+    <button class="btn-primary">+ New Project</button>
+  </div>
+
+  <div class="option-label">
+    Option B — Clicking a project highlights it and shows all its references in a sticky right panel.
+  </div>
+
+  <div class="split-layout">
+    <!-- Left: project cards (2-col) -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-content:start;">
+
+      <!-- Card — selected state -->
+      <div class="proj-card" style="border-left:3px solid #6366f1;border-color:#6366f140;outline:2px solid #6366f1;outline-offset:2px;cursor:pointer" onclick="selectProject('tfls')">
+        <div class="card-top">
+          <div><div class="card-name">TFLS I&amp;D</div><div class="card-desc">Infrastructure &amp; Delivery</div><div class="card-badge badge-proj"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Project</div></div>
+          <div class="card-actions">
+            <button class="icon-btn"><svg class="icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button class="icon-btn red"><svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+          </div>
+        </div>
+        <div class="card-stats"><div><span class="lbl">Total </span><span class="val">8</span></div><div><span class="lbl">Done </span><span class="val green">3</span></div><div><span class="lbl">Overdue </span><span class="val red">1</span></div></div>
+        <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;"><span style="color:#71717a">Progress</span><span style="color:#a1a1aa">38%</span></div><div class="prog-bar"><div class="prog-fill" style="width:38%;background:#6366f1"></div></div></div>
+        <div class="card-btns"><button class="btn-add" style="background:#6366f1">+ Add Task</button><button class="btn-view">View Tasks</button></div>
+      </div>
+
+      <div class="proj-card" style="border-left:3px solid #10b981;cursor:pointer" onclick="selectProject('atr')">
+        <div class="card-top">
+          <div><div class="card-name">DailyATR / Buddy</div><div class="card-badge badge-act"><svg class="icon-sm" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>Ongoing</div></div>
+          <div class="card-actions"><button class="icon-btn"><svg class="icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="icon-btn red"><svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button></div>
+        </div>
+        <div class="card-stats"><div><span class="lbl">Total </span><span class="val">5</span></div><div><span class="lbl">Done </span><span class="val green">5</span></div></div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(45,212,191,.6)"><svg class="icon-sm" style="color:rgba(45,212,191,.6)" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>Ongoing</div>
+        <div class="card-btns"><button class="btn-add" style="background:#10b981">+ Add Task</button><button class="btn-view">View Tasks</button></div>
+      </div>
+
+      <div class="proj-card" style="border-left:3px solid #f59e0b;cursor:pointer" onclick="selectProject('todo')">
+        <div class="card-top"><div><div class="card-name">Todo App</div><div class="card-badge badge-proj"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Project</div></div><div class="card-actions"><button class="icon-btn"><svg class="icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="icon-btn red"><svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button></div></div>
+        <div class="card-stats"><div><span class="lbl">Total </span><span class="val">12</span></div><div><span class="lbl">Done </span><span class="val green">7</span></div></div>
+        <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;"><span style="color:#71717a">Progress</span><span style="color:#a1a1aa">58%</span></div><div class="prog-bar"><div class="prog-fill" style="width:58%;background:#f59e0b"></div></div></div>
+        <div class="card-btns"><button class="btn-add" style="background:#f59e0b">+ Add Task</button><button class="btn-view">View Tasks</button></div>
+      </div>
+
+    </div>
+
+    <!-- Right: sticky references panel -->
+    <div class="split-panel">
+      <div class="split-panel-header">
+        <div>
+          <div class="split-panel-title">References</div>
+          <div class="split-panel-sub"><span class="split-panel-dot" style="background:#6366f1"></span>TFLS I&amp;D</div>
+        </div>
+        <button class="btn-primary" style="font-size:12px;padding:6px 12px">+ Add</button>
+      </div>
+
+      <div class="split-panel-tabs">
+        <button class="split-tab active">All (3)</button>
+        <button class="split-tab">URL</button>
+        <button class="split-tab">Note</button>
+        <button class="split-tab">Doc</button>
+      </div>
+
+      <div class="split-panel-body" style="padding:14px">
+        <div class="ref-item" style="margin-bottom:8px">
+          <div class="ref-item-top">
+            <span class="ref-type-pill pill-url"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>URL</span>
+            <span class="ref-title">SharePoint Site</span>
+            <div class="ref-actions"><button class="icon-btn"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="icon-btn red"><svg class="icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button></div>
+          </div>
+          <a class="ref-url-link" href="#"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> sharepoint.com/sites/TFLS-ID</a>
+        </div>
+        <div class="ref-item" style="margin-bottom:8px">
+          <div class="ref-item-top">
+            <span class="ref-type-pill pill-note"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Note</span>
+            <span class="ref-title">WBSe Codes</span>
+            <div class="ref-actions"><button class="icon-btn"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="icon-btn red"><svg class="icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button></div>
+          </div>
+          <div class="ref-notes">INFRA-0042-CD · INFRA-0043-SD<br>Use INFRA-0043 for all dev sub-tasks.</div>
+        </div>
+        <div class="ref-item">
+          <div class="ref-item-top">
+            <span class="ref-type-pill pill-doc"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Doc</span>
+            <span class="ref-title">Architecture Overview</span>
+            <div class="ref-actions"><button class="icon-btn"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="icon-btn red"><svg class="icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button></div>
+          </div>
+          <a class="ref-url-link" href="#"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> confluence.company.com/arch-overview</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     OPTION C — Tabs inside the project card
+════════════════════════════════════════════════════════════════════ -->
+<div class="page" id="page-c">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Projects</div>
+      <div class="page-sub">4 active projects</div>
+    </div>
+    <button class="btn-primary">+ New Project</button>
+  </div>
+
+  <div class="option-label">
+    Option C — Each card has Overview / References tabs. References are always one click away inside the card.
+  </div>
+
+  <div class="card-grid">
+
+    <!-- Card 1 — Overview tab active -->
+    <div class="proj-card" style="border-left:3px solid #6366f1">
+      <div class="card-top">
+        <div><div class="card-name">TFLS I&amp;D</div><div class="card-desc">Infrastructure &amp; Delivery</div><div class="card-badge badge-proj"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Project</div></div>
+        <div class="card-actions">
+          <button class="icon-btn violet"><svg class="icon" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></button>
+          <button class="icon-btn"><svg class="icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="icon-btn red"><svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+        </div>
+      </div>
+
+      <div class="card-tabs">
+        <div class="card-tab active" onclick="switchCardTab('c1','overview')">Overview</div>
+        <div class="card-tab" onclick="switchCardTab('c1','refs')">References <span style="font-size:10px;color:#818cf8;background:rgba(99,102,241,.15);padding:1px 5px;border-radius:10px;margin-left:3px">3</span></div>
+      </div>
+
+      <div class="card-tab-content active" id="c1-overview">
+        <div class="card-stats"><div><span class="lbl">Total </span><span class="val">8</span></div><div><span class="lbl">Done </span><span class="val green">3</span></div><div><span class="lbl">Overdue </span><span class="val red">1</span></div></div>
+        <div style="margin-top:12px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;"><span style="color:#71717a">Progress</span><span style="color:#a1a1aa">38%</span></div><div class="prog-bar"><div class="prog-fill" style="width:38%;background:#6366f1"></div></div></div>
+        <div class="card-btns" style="margin-top:12px"><button class="btn-add" style="background:#6366f1">+ Add Task</button><button class="btn-view">View Tasks</button></div>
+      </div>
+
+      <div class="card-tab-content" id="c1-refs">
+        <div class="ref-mini">
+          <div class="ref-mini-icon" style="background:rgba(99,102,241,.12);color:#818cf8"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
+          <div><div class="ref-mini-title">SharePoint Site</div><div class="ref-mini-link">sharepoint.com/sites/TFLS-ID</div></div>
+        </div>
+        <div class="ref-mini">
+          <div class="ref-mini-icon" style="background:rgba(251,191,36,.12);color:#fbbf24"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+          <div><div class="ref-mini-title">WBSe Codes</div><div class="ref-mini-meta">INFRA-0042-CD · INFRA-0043-SD</div></div>
+        </div>
+        <div class="ref-mini">
+          <div class="ref-mini-icon" style="background:rgba(52,211,153,.12);color:#34d399"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+          <div><div class="ref-mini-title">Architecture Overview</div><div class="ref-mini-link">confluence.company.com/arch</div></div>
+        </div>
+        <button class="add-ref-btn" style="margin-top:8px"><svg class="icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add reference</button>
+      </div>
+    </div>
+
+    <!-- Card 2 — References tab active -->
+    <div class="proj-card" style="border-left:3px solid #10b981">
+      <div class="card-top">
+        <div><div class="card-name">DailyATR / Buddy</div><div class="card-badge badge-act"><svg class="icon-sm" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>Ongoing</div></div>
+        <div class="card-actions"><button class="icon-btn violet"><svg class="icon" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></button><button class="icon-btn"><svg class="icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="icon-btn red"><svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button></div>
+      </div>
+
+      <div class="card-tabs">
+        <div class="card-tab" onclick="switchCardTab('c2','overview')">Overview</div>
+        <div class="card-tab active" onclick="switchCardTab('c2','refs')">References <span style="font-size:10px;color:#818cf8;background:rgba(99,102,241,.15);padding:1px 5px;border-radius:10px;margin-left:3px">1</span></div>
+      </div>
+
+      <div class="card-tab-content" id="c2-overview">
+        <div class="card-stats"><div><span class="lbl">Total </span><span class="val">5</span></div><div><span class="lbl">Done </span><span class="val green">5</span></div></div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(45,212,191,.6)"><svg class="icon-sm" style="color:rgba(45,212,191,.6)" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>Ongoing</div>
+        <div class="card-btns" style="margin-top:12px"><button class="btn-add" style="background:#10b981">+ Add Task</button><button class="btn-view">View Tasks</button></div>
+      </div>
+
+      <div class="card-tab-content active" id="c2-refs">
+        <div class="ref-mini">
+          <div class="ref-mini-icon" style="background:rgba(99,102,241,.12);color:#818cf8"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
+          <div><div class="ref-mini-title">ATR Dashboard</div><div class="ref-mini-link">app.dailyatr.internal/board</div></div>
+        </div>
+        <button class="add-ref-btn" style="margin-top:8px"><svg class="icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add reference</button>
+      </div>
+    </div>
+
+    <!-- Card 3 — empty refs -->
+    <div class="proj-card" style="border-left:3px solid #f59e0b">
+      <div class="card-top">
+        <div><div class="card-name">Todo App</div><div class="card-badge badge-proj"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Project</div></div>
+        <div class="card-actions"><button class="icon-btn violet"><svg class="icon" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></button><button class="icon-btn"><svg class="icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="icon-btn red"><svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button></div>
+      </div>
+
+      <div class="card-tabs">
+        <div class="card-tab active" onclick="switchCardTab('c3','overview')">Overview</div>
+        <div class="card-tab" onclick="switchCardTab('c3','refs')">References</div>
+      </div>
+
+      <div class="card-tab-content active" id="c3-overview">
+        <div class="card-stats"><div><span class="lbl">Total </span><span class="val">12</span></div><div><span class="lbl">Done </span><span class="val green">7</span></div></div>
+        <div style="margin-top:12px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;"><span style="color:#71717a">Progress</span><span style="color:#a1a1aa">58%</span></div><div class="prog-bar"><div class="prog-fill" style="width:58%;background:#f59e0b"></div></div></div>
+        <div class="card-btns" style="margin-top:12px"><button class="btn-add" style="background:#f59e0b">+ Add Task</button><button class="btn-view">View Tasks</button></div>
+      </div>
+
+      <div class="card-tab-content" id="c3-refs">
+        <div class="no-refs">No references yet.</div>
+        <button class="add-ref-btn"><svg class="icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add first reference</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function switchTab(id) {
+    document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', ['a','b','c'][i] === id))
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
+    document.getElementById('page-' + id).classList.add('active')
+  }
+
+  function toggleRefs(id) {
+    const body    = document.getElementById('refs-body-' + id)
+    const chevron = document.getElementById('chevron-' + id)
+    const hidden  = body.style.display === 'none'
+    body.style.display    = hidden ? 'flex' : 'none'
+    chevron.style.transform = hidden ? '' : 'rotate(180deg)'
+  }
+
+  function switchCardTab(cardId, tab) {
+    const card = document.getElementById(cardId + '-overview').closest('.proj-card')
+    card.querySelectorAll('.card-tab').forEach(t => {
+      const isTarget = (tab === 'overview' && t.textContent.trim().startsWith('Overview')) ||
+                       (tab === 'refs'     && t.textContent.trim().startsWith('References'))
+      t.classList.toggle('active', isTarget)
+    })
+    document.getElementById(cardId + '-overview').classList.toggle('active', tab === 'overview')
+    document.getElementById(cardId + '-refs').classList.toggle('active', tab === 'refs')
+  }
+</script>
+</body>
+</html>

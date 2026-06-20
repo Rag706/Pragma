@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskFlow — Starting…</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #09090b;
+      color: #e4e4e7;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    .icon {
+      width: 56px;
+      height: 56px;
+      background: #6366f1;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 700;
+      color: white;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #f4f4f5;
+    }
+    .status {
+      font-size: 13px;
+      color: #71717a;
+    }
+    .dots span {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #6366f1;
+      margin: 0 3px;
+      animation: bounce 1.2s infinite ease-in-out;
+    }
+    .dots span:nth-child(2) { animation-delay: 0.2s; }
+    .dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40%           { transform: scale(1.0); opacity: 1.0; }
+    }
+    .error { color: #f87171; font-size: 13px; text-align: center; max-width: 280px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">T</div>
+    <h1>TaskFlow</h1>
+    <div class="dots"><span></span><span></span><span></span></div>
+    <p class="status" id="msg">Starting up…</p>
+  </div>
+
+  <script>
+    const msg = document.getElementById('msg');
+    let attempts = 0;
+    const MAX = 60;
+
+    async function isUp(url) {
+      try {
+        await fetch(url, { mode: 'no-cors' });
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    async function check() {
+      attempts++;
+      if (attempts > MAX) {
+        msg.outerHTML = '<p class="error">Could not connect after 60 seconds.<br>Try running start_debug.bat to see errors.</p>';
+        return;
+      }
+
+      const [backend, frontend] = await Promise.all([
+        isUp('http://localhost:59080/'),
+        isUp('http://localhost:5173/'),
+      ]);
+
+      if (backend && frontend) {
+        msg.textContent = 'Ready!';
+        window.location.replace('http://localhost:5173/');
+        return;
+      }
+
+      const parts = [];
+      if (!backend)  parts.push('backend');
+      if (!frontend) parts.push('frontend');
+      msg.textContent = 'Waiting for ' + parts.join(' & ') + '…';
+      setTimeout(check, 1000);
+    }
+
+    check();
+  </script>
+</body>
+</html>
