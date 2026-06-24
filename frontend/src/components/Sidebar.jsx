@@ -12,6 +12,9 @@ export default function Sidebar() {
   const taskCountMap = Object.fromEntries(
     (stats?.project_stats ?? []).map(p => [p.id, p.total - (p.done ?? 0)])
   )
+  const topRankMap = Object.fromEntries(
+    (stats?.project_stats ?? []).map(p => [p.id, p.top_rank ?? null])
+  )
 
   const navigate       = useNavigate()
   const location       = useLocation()
@@ -102,6 +105,12 @@ export default function Sidebar() {
               >
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
                 <span className="truncate flex-1">{p.name}</span>
+                {topRankMap[p.id] != null && (
+                  <span className="text-[10px] rounded-full px-1.5 py-0.5 leading-none shrink-0 font-black"
+                    style={{ background: p.color + '2e', color: p.color, border: `1px solid ${p.color}55` }}>
+                    #{topRankMap[p.id]}
+                  </span>
+                )}
                 {taskCountMap[p.id] > 0 && (
                   <span className="text-[10px] bg-zinc-700 text-zinc-400 rounded-full px-1.5 py-0.5 leading-none shrink-0">
                     {taskCountMap[p.id]}

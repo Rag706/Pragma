@@ -4,6 +4,7 @@ export const STATUS_CONFIG = {
   // ── Main workflow ──────────────────────────────────────────────────
   backlog:     { label: 'Backlog',     ring: 'ring-zinc-700',    dot: 'bg-zinc-600',    text: 'text-zinc-500'    },
   todo:        { label: 'To Do',       ring: 'ring-zinc-600',    dot: 'bg-zinc-500',    text: 'text-zinc-400'    },
+  up_next:     { label: 'Up Next',     ring: 'ring-amber-500',   dot: 'bg-amber-400',   text: 'text-amber-300'   },
   planning:    { label: 'Planning',    ring: 'ring-sky-500',     dot: 'bg-sky-400',     text: 'text-sky-300'     },
   in_progress: { label: 'In Progress', ring: 'ring-indigo-500',  dot: 'bg-indigo-400',  text: 'text-indigo-300'  },
   review:      { label: 'Review',      ring: 'ring-violet-500',  dot: 'bg-violet-400',  text: 'text-violet-300'  },
@@ -23,6 +24,7 @@ export const STATUS_GROUPS = [
     options: [
       { value: 'backlog',     label: 'Backlog'     },
       { value: 'todo',        label: 'To Do'       },
+      { value: 'up_next',     label: 'Up Next'     },
       { value: 'in_progress', label: 'In Progress' },
       { value: 'review',      label: 'Review'      },
       { value: 'done',        label: 'Done'        },

@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, CheckCircle2, Circle, Clock, PauseCircle, XCircle, SlidersHorizontal, Trash, ArrowUpDown, ArrowUp, ArrowDown, Check, MoreHorizontal, HelpCircle, Archive, Lightbulb, Eye, FlaskConical, Ban, MinusCircle, ChevronDown, ChevronRight } from 'lucide-react'
-import { getTasks, updateTaskStatus, deleteTask, deleteAllTasks, bulkDeleteTasks, bulkUpdateTasks } from '../api/tasks'
+import { Search, CheckCircle2, Circle, Clock, PauseCircle, XCircle, SlidersHorizontal, Trash, ArrowUpDown, ArrowUp, ArrowDown, Check, MoreHorizontal, HelpCircle, Archive, Lightbulb, Eye, FlaskConical, Ban, MinusCircle, ChevronDown, ChevronRight, Star, ArrowRight } from 'lucide-react'
+import { getTasks, updateTask, updateTaskStatus, deleteTask, deleteAllTasks, bulkDeleteTasks, bulkUpdateTasks } from '../api/tasks'
 import { getProjects } from '../api/projects'
 import { StatusBadge, PriorityBadge, ProjectDot, STATUS_CONFIG, STATUS_GROUPS } from '../components/Badge'
 import TaskDrawer from '../components/TaskDrawer'
@@ -14,6 +14,7 @@ import clsx from 'clsx'
 const STATUS_ICONS = {
   backlog:     <Archive      size={15} className="text-zinc-600"    />,
   todo:        <Circle       size={15} className="text-zinc-500"    />,
+  up_next:     <ArrowRight   size={15} className="text-amber-400"   />,
   planning:    <Lightbulb    size={15} className="text-sky-400"     />,
   in_progress: <Clock        size={15} className="text-indigo-400"  />,
   review:      <Eye          size={15} className="text-violet-400"  />,
@@ -27,14 +28,15 @@ const STATUS_ICONS = {
 
 const STATUS_DESCRIPTIONS = {
   backlog:     'Not yet scheduled or prioritized',
-  todo:        'Ready to start working on',
+  todo:        'Ready to start, but not urgent',
+  up_next:     'Starting this very soon',
   in_progress: 'Actively being worked on now',
   review:      'Waiting for review or approval',
   done:        'Completed successfully',
   cancelled:   'No longer needed',
 }
 
-const STATUS_PICKER_OPTIONS = ['backlog', 'todo', 'in_progress', 'review', 'done', 'cancelled']
+const STATUS_PICKER_OPTIONS = ['backlog', 'todo', 'up_next', 'in_progress', 'review', 'done', 'cancelled']
 
 function StatusPicker({ taskId, currentStatus, onStatusChange }) {
   const [open, setOpen] = useState(false)
@@ -100,9 +102,106 @@ function StatusPicker({ taskId, currentStatus, onStatusChange }) {
   )
 }
 
+function hexToRgba(hex, a) {
+  const h = (hex || '#f59e0b').replace('#', '')
+  const r = parseInt(h.slice(0,2), 16)
+  const g = parseInt(h.slice(2,4), 16)
+  const b = parseInt(h.slice(4,6), 16)
+  return `rgba(${r},${g},${b},${a})`
+}
+// Visual hierarchy: #1 = solid filled, #2 = tinted, #3 = ghost
+function rankBadgeStyle(color, rank) {
+  const c = color || '#f59e0b'
+  if (rank === 1) return { background: c, color: '#fff', border: `1px solid ${c}` }
+  if (rank === 2) return { background: hexToRgba(c, 0.18), color: c, border: `1px solid ${hexToRgba(c, 0.40)}` }
+  return { background: hexToRgba(c, 0.08), color: hexToRgba(c, 0.55), border: `1px solid ${hexToRgba(c, 0.20)}` }
+}
+const RANK_ROW_A    = { 1: 0.12, 2: 0.05, 3: 0.02 }
+const RANK_HOVER_A  = { 1: 0.16, 2: 0.08, 3: 0.04 }
+const RANK_BORDER_A = { 1: 1.00, 2: 0.45, 3: 0.20 }
+
+function RankPicker({ currentRank, projectColor = '#f59e0b', onRankChange, asBadge = false, alwaysVisible = false }) {
+  const [open, setOpen] = useState(false)
+  const [pos,  setPos]  = useState({ top: 0, left: 0 })
+  const btnRef = useRef(null)
+  const popRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handleClick(e) {
+      if (!popRef.current?.contains(e.target) && !btnRef.current?.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open])
+
+  function handleOpen(e) {
+    e.stopPropagation()
+    const rect = btnRef.current.getBoundingClientRect()
+    const popupW = 152
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - popupW - 8))
+    setPos({ top: rect.bottom + 4, left })
+    setOpen(o => !o)
+  }
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={handleOpen}
+        title={currentRank ? `Rank #${currentRank} — click to change` : 'Set rank'}
+        className={clsx(
+          asBadge && currentRank
+            ? 'inline-flex items-center text-[10px] font-black px-2 py-0.5 rounded shrink-0 transition-opacity hover:opacity-75 border-0 cursor-pointer'
+            : currentRank
+            ? 'w-6 h-6 flex items-center justify-center rounded text-[11px] font-black transition-all leading-none'
+            : alwaysVisible
+            ? 'text-[14px] font-normal transition-colors text-zinc-700 hover:text-zinc-500 leading-none'
+            : 'w-6 h-6 flex items-center justify-center rounded text-[11px] font-black transition-all leading-none opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-amber-400'
+        )}
+        style={asBadge && currentRank ? rankBadgeStyle(projectColor, currentRank) : currentRank ? { color: projectColor } : {}}
+      >
+        {currentRank ? `#${currentRank}` : alwaysVisible ? '—' : <Star size={13} />}
+      </button>
+
+      {open && (
+        <div
+          ref={popRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 200 }}
+          className="flex items-center gap-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-2xl p-1.5"
+          onClick={e => e.stopPropagation()}
+        >
+          {[1, 2, 3].map(n => (
+            <button
+              key={n}
+              onClick={() => { onRankChange(currentRank === n ? null : n); setOpen(false) }}
+              className="w-7 h-7 rounded-md text-[11px] font-black border transition-all"
+              style={currentRank === n
+                ? { ...rankBadgeStyle(projectColor, n), borderRadius: 6 }
+                : { color: '#71717a', borderColor: 'transparent' }
+              }
+            >
+              #{n}
+            </button>
+          ))}
+          <div className="w-px h-4 bg-zinc-700 mx-0.5" />
+          <button
+            onClick={() => { onRankChange(null); setOpen(false) }}
+            title="Remove rank"
+            className="w-7 h-7 rounded-md text-xs text-zinc-500 hover:text-red-400 border border-transparent hover:border-zinc-700 transition-all flex items-center justify-center"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+    </>
+  )
+}
+
 const STATUS_CYCLE = {
   backlog:     'todo',
-  todo:        'in_progress',
+  todo:        'up_next',
+  up_next:     'in_progress',
   planning:    'in_progress',
   in_progress: 'review',
   review:      'testing',
@@ -139,7 +238,39 @@ export default function Tasks() {
   const [quickAddOpen, setQuickAddOpen]   = useState(false)
   const [menuOpen,       setMenuOpen]       = useState(false)
   const [showCompleted,  setShowCompleted]  = useState(false)
+  const [rankedOnly,     setRankedOnly]     = useState(false)
   const menuRef = useRef(null)
+
+  const [colWidths, setColWidths] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pragma_task_col_widths') || 'null') || { project: 130, priority: 90, status: 90, due: 80 } }
+    catch { return { project: 130, priority: 90, status: 90, due: 80 } }
+  })
+
+  const gridStyle = {
+    gridTemplateColumns: `20px 28px 40px 1fr ${colWidths.project}px ${colWidths.priority}px ${colWidths.status}px ${colWidths.due}px 72px`
+  }
+
+  function startColResize(e, col) {
+    e.preventDefault()
+    e.stopPropagation()
+    const startX = e.clientX
+    const startW = colWidths[col]
+    const mins   = { project: 80, priority: 65, status: 65, due: 55 }
+    function onMove(ev) {
+      const w = Math.max(mins[col], Math.min(320, startW + ev.clientX - startX))
+      setColWidths(prev => {
+        const next = { ...prev, [col]: w }
+        localStorage.setItem('pragma_task_col_widths', JSON.stringify(next))
+        return next
+      })
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
 
   // N key: open QuickAdd and close any open task drawer
   useEffect(() => {
@@ -282,12 +413,13 @@ export default function Tasks() {
 
   const isCompletedFilter = statusFilter === 'done' || statusFilter === 'cancelled'
 
-  const activeTasks = useMemo(() =>
-    isCompletedFilter
+  const activeTasks = useMemo(() => {
+    const base = isCompletedFilter
       ? sortedTasks
-      : sortedTasks.filter(t => t.status !== 'done' && t.status !== 'cancelled'),
-    [sortedTasks, isCompletedFilter]
-  )
+      : sortedTasks.filter(t => t.status !== 'done' && t.status !== 'cancelled')
+    if (!rankedOnly) return base
+    return [...base.filter(t => t.rank != null)].sort((a, b) => a.rank - b.rank)
+  }, [sortedTasks, isCompletedFilter, rankedOnly])
 
   const completedTasks = useMemo(() =>
     isCompletedFilter
@@ -333,6 +465,14 @@ export default function Tasks() {
     mutationFn: ({ ids, data }) => bulkUpdateTasks(ids, data),
     onSuccess: () => {
       setSelectedIds(new Set())
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      qc.invalidateQueries({ queryKey: ['stats'] })
+    },
+  })
+
+  const rankMutation = useMutation({
+    mutationFn: ({ id, rank }) => updateTask(id, { rank }),
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
       qc.invalidateQueries({ queryKey: ['stats'] })
     },
@@ -472,6 +612,18 @@ export default function Tasks() {
 
         {/* Filter bar */}
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setRankedOnly(o => !o)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors shrink-0 ${
+              rankedOnly
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                : 'border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600'
+            }`}
+          >
+            <Star size={11} className={rankedOnly ? 'fill-amber-400 text-amber-400' : ''} />
+            Ranked
+          </button>
+
           <div className="relative flex-1 min-w-[180px]">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
             <input
@@ -538,7 +690,7 @@ export default function Tasks() {
           <div className="px-6 pb-6">
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
               {/* Column headers */}
-              <div className="grid grid-cols-[20px_28px_1fr_130px_90px_90px_80px_56px] gap-3 px-4 py-2.5 border-b border-zinc-800 text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">
+              <div className="grid gap-3 px-4 py-2.5 border-b border-zinc-800 text-[10px] font-semibold text-zinc-600 uppercase tracking-wider" style={gridStyle}>
                 <input
                   type="checkbox"
                   checked={activeTasks.length > 0 && selectedIds.size === activeTasks.length}
@@ -547,11 +699,29 @@ export default function Tasks() {
                   className="accent-indigo-500 cursor-pointer"
                 />
                 <span />
+                <span className="flex items-center justify-center"><Star size={9} /></span>
                 <button onClick={() => toggleSort('title')} className="flex items-center gap-1 hover:text-zinc-400 transition-colors text-left">Task <SortIcon field="title" /></button>
-                <span>Project</span>
-                <button onClick={() => toggleSort('priority')} className="flex items-center gap-1 hover:text-zinc-400 transition-colors">Priority <SortIcon field="priority" /></button>
-                <button onClick={() => toggleSort('status')} className="flex items-center gap-1 hover:text-zinc-400 transition-colors">Status <SortIcon field="status" /></button>
-                <button onClick={() => toggleSort('due_date')} className="flex items-center gap-1 hover:text-zinc-400 transition-colors">Due <SortIcon field="due_date" /></button>
+                <span className="relative flex items-center select-none">
+                  Project
+                  <div className="absolute -right-2 top-0 bottom-0 w-4 cursor-col-resize z-10 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity" onMouseDown={e => startColResize(e, 'project')}>
+                    <div className="w-0.5 h-4 bg-zinc-400 rounded-full" />
+                  </div>
+                </span>
+                <button onClick={() => toggleSort('priority')} className="relative flex items-center gap-1 hover:text-zinc-400 transition-colors">
+                  Priority <SortIcon field="priority" />
+                  <div className="absolute -right-2 top-0 bottom-0 w-4 cursor-col-resize z-10 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity" onMouseDown={e => startColResize(e, 'priority')}>
+                    <div className="w-0.5 h-4 bg-zinc-400 rounded-full" />
+                  </div>
+                </button>
+                <button onClick={() => toggleSort('status')} className="relative flex items-center gap-1 hover:text-zinc-400 transition-colors">
+                  Status <SortIcon field="status" />
+                  <div className="absolute -right-2 top-0 bottom-0 w-4 cursor-col-resize z-10 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity" onMouseDown={e => startColResize(e, 'status')}>
+                    <div className="w-0.5 h-4 bg-zinc-400 rounded-full" />
+                  </div>
+                </button>
+                <button onClick={() => toggleSort('due_date')} className="relative flex items-center gap-1 hover:text-zinc-400 transition-colors">
+                  Due <SortIcon field="due_date" />
+                </button>
                 <span />
               </div>
 
@@ -567,29 +737,50 @@ export default function Tasks() {
                   <div
                     key={task.id}
                     className={clsx(
-                      'grid grid-cols-[20px_28px_1fr_130px_90px_90px_80px_56px] gap-3 items-center px-4 py-3 border-b border-zinc-800/50 cursor-pointer group transition-colors relative',
-                      isChecked  ? 'bg-indigo-950/20' :
-                      isOverdue  ? 'bg-red-500/5 hover:bg-red-500/10' :
-                                   'hover:bg-zinc-800/40'
+                      'grid gap-3 items-center px-4 py-3 border-b border-zinc-800/50 cursor-pointer group transition-colors relative',
+                      isChecked           ? 'bg-indigo-950/20' :
+                      !task.rank && isOverdue ? 'bg-red-500/5 hover:bg-red-500/10' :
+                      !task.rank          ? 'hover:bg-zinc-800/40' : ''
                     )}
-                    style={isOverdue ? { borderLeft: '3px solid #f87171' } : {}}
+                    style={{
+                      ...gridStyle,
+                      ...(isChecked ? {} : task.rank ? {
+                        backgroundColor: hexToRgba(proj?.color || '#f59e0b', RANK_ROW_A[task.rank]),
+                        borderLeft: `3px solid ${hexToRgba(proj?.color || '#f59e0b', RANK_BORDER_A[task.rank])}`,
+                      } : isOverdue ? { borderLeft: '3px solid #f87171' } : {})
+                    }}
+                    onMouseEnter={e => { if (!isChecked && task.rank) e.currentTarget.style.backgroundColor = hexToRgba(proj?.color || '#f59e0b', RANK_HOVER_A[task.rank]) }}
+                    onMouseLeave={e => { if (!isChecked && task.rank) e.currentTarget.style.backgroundColor = hexToRgba(proj?.color || '#f59e0b', RANK_ROW_A[task.rank]) }}
                     onClick={() => openTask(task)}
                   >
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => toggleSelect(task.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="accent-indigo-500 cursor-pointer"
-                    />
-                    <StatusPicker
-                      taskId={task.id}
-                      currentStatus={task.status}
-                      onStatusChange={(status) => statusMutation.mutate({ id: task.id, status })}
-                    />
+                    <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleSelect(task.id)}
+                        className="accent-indigo-500 cursor-pointer"
+                      />
+                    </div>
+                    <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
+                      <StatusPicker
+                        taskId={task.id}
+                        currentStatus={task.status}
+                        onStatusChange={(status) => statusMutation.mutate({ id: task.id, status })}
+                      />
+                    </div>
+
+                    <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
+                      <RankPicker
+                        currentRank={task.rank}
+                        projectColor={proj?.color}
+                        onRankChange={(rank) => rankMutation.mutate({ id: task.id, rank })}
+                        asBadge={!!task.rank}
+                        alwaysVisible
+                      />
+                    </div>
 
                     <span className="flex flex-col min-w-0 gap-1">
-                      <span className={clsx('text-sm truncate', isDone ? 'line-through text-zinc-600' : isCancelled ? 'line-through text-zinc-600' : 'text-zinc-200')}>
+                      <span className={clsx('text-sm', isDone ? 'line-through text-zinc-600' : isCancelled ? 'line-through text-zinc-600' : 'text-zinc-200')}>
                         {task.title}
                       </span>
                       {task.checklist_items?.length > 0 ? (() => {
@@ -643,7 +834,7 @@ export default function Tasks() {
                       {due?.label ?? '—'}
                     </span>
 
-                    <div className="flex items-center gap-0.5">
+                    <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
                       {!isDone && (
                         <button
                           onClick={(e) => {
@@ -697,9 +888,10 @@ export default function Tasks() {
                       <div
                         key={task.id}
                         className={clsx(
-                          'grid grid-cols-[20px_28px_1fr_130px_90px_90px_80px_56px] gap-3 items-center px-4 py-3 border-b border-zinc-800/50 cursor-pointer group transition-all relative opacity-50 hover:opacity-80',
+                          'grid gap-3 items-center px-4 py-3 border-b border-zinc-800/50 cursor-pointer group transition-all relative opacity-50 hover:opacity-80',
                           isChecked ? 'bg-indigo-950/20' : 'hover:bg-zinc-800/40'
                         )}
+                        style={gridStyle}
                         onClick={() => openTask(task)}
                       >
                         <input
@@ -715,8 +907,10 @@ export default function Tasks() {
                           onStatusChange={(status) => statusMutation.mutate({ id: task.id, status })}
                         />
 
+                        <span />
+
                         <span className="flex flex-col min-w-0 gap-1">
-                          <span className="text-sm truncate line-through text-zinc-600">
+                          <span className="text-sm line-through text-zinc-600">
                             {task.title}
                           </span>
                           {task.checklist_items?.length > 0 && (() => {

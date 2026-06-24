@@ -94,6 +94,13 @@ def update_task(task_id: int, update: schemas.TaskUpdate, db: Session = Depends(
     if not task:
         raise HTTPException(404, "Task not found")
     data = update.model_dump(exclude_unset=True)
+    # Enforce one rank per project — clear any sibling task holding the same rank
+    if "rank" in data and data["rank"] is not None and task.project_id:
+        db.query(models.Task).filter(
+            models.Task.project_id == task.project_id,
+            models.Task.rank == data["rank"],
+            models.Task.id != task_id,
+        ).update({"rank": None}, synchronize_session=False)
     if "status" in data:
         if data["status"] == "done" and task.status != "done":
             data["completed_at"] = datetime.now(timezone.utc)

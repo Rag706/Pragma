@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { getTasks, updateTaskStatus } from '../api/tasks'
@@ -10,6 +10,7 @@ import { format, parseISO, isPast, isToday, isTomorrow } from 'date-fns'
 const COLUMNS = [
   { key: 'backlog',     label: 'Backlog',     statuses: ['backlog', 'planning'],                        hex: '#52525b' },
   { key: 'todo',        label: 'To Do',       statuses: ['todo'],                                       hex: '#71717a' },
+  { key: 'up_next',     label: 'Up Next',     statuses: ['up_next'],                                     hex: '#fbbf24' },
   { key: 'in_progress', label: 'In Progress', statuses: ['in_progress', 'blocked', 'waiting', 'on_hold'], hex: '#818cf8' },
   { key: 'review',      label: 'Review',      statuses: ['review', 'testing'],                          hex: '#a78bfa' },
   { key: 'done',        label: 'Done',        statuses: ['done'],                                       hex: '#34d399' },
@@ -17,7 +18,7 @@ const COLUMNS = [
 ]
 
 const COL_TEXT = {
-  backlog: 'text-zinc-400', todo: 'text-zinc-400',
+  backlog: 'text-zinc-400', todo: 'text-zinc-400', up_next: 'text-amber-300',
   in_progress: 'text-indigo-300', review: 'text-violet-300',
   done: 'text-emerald-300', cancelled: 'text-zinc-600',
 }
@@ -48,6 +49,10 @@ export default function Kanban() {
   const [quickAddOpen, setQuickAddOpen]   = useState(false)
   const [dragging, setDragging]           = useState(null)
   const [dragOver, setDragOver]           = useState(null)
+  const [colWidths, setColWidths]         = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pragma_col_widths') || '{}') }
+    catch { return {} }
+  })
 
   const { data: allTasks = [], isLoading } = useQuery({
     queryKey: ['tasks', { project_id: projectFilter || undefined }],
@@ -82,6 +87,28 @@ export default function Kanban() {
     setDragging(null)
     setDragOver(null)
   }
+
+  const startResize = useCallback((e, colKey) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const startX = e.clientX
+    const startWidth = colWidths[colKey] ?? 272
+
+    function onMove(ev) {
+      const w = Math.max(180, Math.min(520, startWidth + ev.clientX - startX))
+      setColWidths(prev => {
+        const next = { ...prev, [colKey]: w }
+        localStorage.setItem('pragma_col_widths', JSON.stringify(next))
+        return next
+      })
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [colWidths])
 
   // Refresh selected task from live data when drawer is open
   const liveSelectedTask = selectedTask
@@ -125,13 +152,13 @@ export default function Kanban() {
           {COLUMNS.map(col => {
             const tasks  = colTasks(col)
             const isOver = dragOver === col.key
-            const countBg = ['in_progress', 'review', 'done'].includes(col.key) && tasks.length > 0
+            const countBg = ['up_next', 'in_progress', 'review', 'done'].includes(col.key) && tasks.length > 0
               ? hexToRgba(col.hex, 0.15) : '#27272a'
-            const countColor = ['in_progress', 'review', 'done'].includes(col.key) && tasks.length > 0
+            const countColor = ['up_next', 'in_progress', 'review', 'done'].includes(col.key) && tasks.length > 0
               ? col.hex : '#71717a'
 
             return (
-              <div key={col.key} className="w-[272px] shrink-0 flex flex-col">
+              <div key={col.key} className="shrink-0 flex flex-col relative" style={{ width: colWidths[col.key] ?? 272 }}>
                 {/* Column header */}
                 <div className="flex items-center justify-between px-3 py-2.5 rounded-t-xl border border-zinc-800 border-b-0 bg-zinc-900">
                   <div className={`flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider ${COL_TEXT[col.key]}`}>
@@ -179,6 +206,14 @@ export default function Kanban() {
                       <span className="text-[11px] text-zinc-700">Empty</span>
                     </div>
                   )}
+                </div>
+
+                {/* Resize handle */}
+                <div
+                  className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize z-20 flex items-center justify-center group"
+                  onMouseDown={e => startResize(e, col.key)}
+                >
+                  <div className="w-px h-12 bg-zinc-700 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               </div>
             )

@@ -200,6 +200,44 @@ export default function TaskDrawer({ task, onClose, onDeleted, noBackdrop = fals
                   </Field>
                 )}
 
+                {/* Rank */}
+                {(() => {
+                  const rankColor = projects.find(p => p.id === form.project_id)?.color || '#f59e0b'
+                  return (
+                    <Field icon={<span className="text-[11px] font-black" style={{ color: form.rank ? rankColor : '#52525b' }}>#{form.rank ?? '—'}</span>} label="Rank">
+                      <div className="flex gap-2">
+                        {[1, 2, 3].map(n => {
+                          const active = form.rank === n
+                          return (
+                            <button
+                              key={n}
+                              onClick={() => saveField('rank', active ? null : n)}
+                              className="h-8 px-3 rounded-lg text-[11px] font-black border transition-all"
+                              style={active
+                                ? (() => {
+                                    if (n === 1) return { background: rankColor, color: '#fff', borderColor: rankColor }
+                                    if (n === 2) return { background: rankColor + '2e', color: rankColor, borderColor: rankColor + '66' }
+                                    return { background: rankColor + '14', color: rankColor + '99', borderColor: rankColor + '33' }
+                                  })()
+                                : { background: 'transparent', color: '#71717a', borderColor: '#3f3f46' }
+                              }
+                            >
+                              #{n}
+                            </button>
+                          )
+                        })}
+                        <button
+                          onClick={() => saveField('rank', null)}
+                          className="h-8 px-3 rounded-lg text-[11px] font-semibold border transition-all"
+                          style={{ background: 'transparent', color: form.rank ? '#71717a' : '#3f3f46', borderColor: '#27272a' }}
+                        >
+                          —
+                        </button>
+                      </div>
+                    </Field>
+                  )
+                })()}
+
                 {/* Progress */}
                 <Field icon={<BarChart2 size={13} />} label={`Progress — ${form.progress ?? 0}%`}>
                   <div className="space-y-2">
@@ -276,10 +314,8 @@ export default function TaskDrawer({ task, onClose, onDeleted, noBackdrop = fals
               </div>
 
               {/* Notes */}
-              <div>
-                <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 mb-2">
-                  <AlignLeft size={13} /> Notes
-                </label>
+              <div className="border-t border-zinc-800 pt-4">
+                <div className="mb-2"><SectionHeader icon={<AlignLeft size={11} />}>Notes</SectionHeader></div>
                 <textarea
                   value={form.notes ?? ''}
                   onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
@@ -291,16 +327,18 @@ export default function TaskDrawer({ task, onClose, onDeleted, noBackdrop = fals
               </div>
 
               {/* Checklist */}
-              <ChecklistField taskId={form.id} initialItems={form.checklist_items ?? []} />
+              <div className="border-t border-zinc-800 pt-4">
+                <ChecklistField taskId={form.id} initialItems={form.checklist_items ?? []} />
+              </div>
 
               {/* Links */}
-              <LinksField taskId={form.id} initialLinks={form.links ?? []} />
+              <div className="border-t border-zinc-800 pt-4">
+                <LinksField taskId={form.id} initialLinks={form.links ?? []} />
+              </div>
 
               {/* Activity Log */}
-              <div>
-                <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 mb-2">
-                  <Clock size={13} /> Activity Log
-                </label>
+              <div className="border-t border-zinc-800 pt-4">
+                <div className="mb-2"><SectionHeader icon={<Clock size={11} />}>Activity Log</SectionHeader></div>
 
                 {/* Add entry */}
                 <div className="flex gap-2 mb-3">
@@ -369,10 +407,21 @@ export default function TaskDrawer({ task, onClose, onDeleted, noBackdrop = fals
 function Field({ icon, label, children }) {
   return (
     <div>
-      <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 mb-1.5">
+      <label className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1.5">
         {icon}{label}
       </label>
       {children}
+    </div>
+  )
+}
+
+function SectionHeader({ icon, children }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500 shrink-0">
+        {icon}{children}
+      </span>
+      <div className="flex-1 h-px bg-zinc-800" />
     </div>
   )
 }
@@ -407,8 +456,8 @@ function TagsField({ taskId, projectId, currentTags }) {
 
   return (
     <div>
-      <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 mb-1.5">
-        <Tag size={13} /> Tags
+      <label className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1.5">
+        <Tag size={11} /> Tags
       </label>
 
       {/* Selected tags */}
@@ -547,14 +596,14 @@ function ChecklistField({ taskId, initialItems }) {
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <button
-          className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-400 transition-colors"
+          className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500 hover:text-zinc-400 transition-colors"
           onClick={() => setCollapsed(c => !c)}
         >
-          {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-          <ListChecks size={13} />
+          {collapsed ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
+          <ListChecks size={11} />
           Checklist
           {total > 0 && (
-            <span className="text-[10px] text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded-full ml-0.5">
+            <span className="text-[10px] text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded-full ml-0.5 normal-case tracking-normal">
               {done}/{total}
             </span>
           )}
@@ -704,9 +753,7 @@ function LinksField({ taskId, initialLinks }) {
 
   return (
     <div>
-      <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 mb-2">
-        <Link2 size={13} /> Links
-      </label>
+      <div className="mb-2"><SectionHeader icon={<Link2 size={11} />}>Links</SectionHeader></div>
 
       {links.length > 0 && (
         <div className="space-y-1.5 mb-2">

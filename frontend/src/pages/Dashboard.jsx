@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { TrendingUp, AlertTriangle, Circle, Check, LayoutDashboard, Target, Clock, CalendarClock, CalendarDays, Zap } from 'lucide-react'
+import { TrendingUp, AlertTriangle, Circle, Check, LayoutDashboard, Target, Clock, CalendarClock, CalendarDays, Zap, Star } from 'lucide-react'
 import { getStats } from '../api/stats'
 import { getTasks, updateTaskStatus } from '../api/tasks'
 import { getProjects } from '../api/projects'
@@ -358,11 +358,12 @@ export default function Dashboard() {
       </div>
 
       {/* KPI row — shown in both modes */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <KPICard label="Overdue"      value={kpis.overdue}      sub="past their deadline"  accent="#f87171" warning />
         <KPICard label="Due Today"    value={kpis.due_today}    sub="need attention today" accent="#fbbf24" warning />
         <KPICard label="Due Tomorrow" value={kpis.due_tomorrow} sub="coming up next"        accent="#a78bfa" />
         <KPICard label="In Progress"  value={kpis.in_progress}  sub="currently working on" accent="#818cf8" />
+        <KPICard label="Ranked"       value={kpis.rank_count}   sub="in your queue"        accent="#f59e0b" />
       </div>
 
       {/* ── OVERVIEW MODE ───────────────────────────────────────── */}

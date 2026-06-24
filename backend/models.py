@@ -43,6 +43,8 @@ class Task(Base):
     completed_at = Column(DateTime, nullable=True)
     progress = Column(Integer, default=0)
     notes = Column(Text, default="")
+    is_focus = Column(Boolean, default=False, nullable=False)
+    rank = Column(Integer, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     tags = relationship("Tag", secondary=task_tags_table, lazy="selectin")

@@ -47,6 +47,7 @@ def get_stats(db: Session = Depends(get_db)):
         func.sum(case((models.Task.priority == "high",   1), else_=0)).label("high"),
         func.sum(case((models.Task.priority == "medium", 1), else_=0)).label("medium"),
         func.sum(case((models.Task.priority == "low",    1), else_=0)).label("low"),
+        func.sum(case((models.Task.rank.isnot(None),     1), else_=0)).label("rank_count"),
     ).first()
 
     # ── Query 2: done-this-week (needs date() on completed_at) ───────
@@ -70,6 +71,7 @@ def get_stats(db: Session = Depends(get_db)):
                 models.Task.due_date.isnot(None),
             ), 1), else_=0
         )).label("overdue"),
+        func.min(models.Task.rank).label("top_rank"),
     ).group_by(models.Task.project_id).all()
 
     stats_map = {r.project_id: r for r in proj_rows}
@@ -77,18 +79,20 @@ def get_stats(db: Session = Depends(get_db)):
     project_stats = []
     for p in projects:
         r = stats_map.get(p.id)
-        p_total   = r.total   if r else 0
-        p_done    = r.done    if r else 0
-        p_overdue = r.overdue if r else 0
+        p_total    = r.total    if r else 0
+        p_done     = r.done     if r else 0
+        p_overdue  = r.overdue  if r else 0
+        p_top_rank = r.top_rank if r else None
         project_stats.append({
-            "id":      p.id,
-            "name":    p.name,
-            "color":   p.color,
-            "type":    p.type,
-            "total":   p_total,
-            "done":    p_done,
-            "overdue": p_overdue,
-            "pct":     round((p_done / p_total * 100) if p_total > 0 else 0),
+            "id":       p.id,
+            "name":     p.name,
+            "color":    p.color,
+            "type":     p.type,
+            "total":    p_total,
+            "done":     p_done,
+            "overdue":  p_overdue,
+            "top_rank": p_top_rank,
+            "pct":      round((p_done / p_total * 100) if p_total > 0 else 0),
         })
 
     # ── Query 4: upcoming tasks with JOIN (not N project lookups) ────
@@ -141,6 +145,7 @@ def get_stats(db: Session = Depends(get_db)):
             "high":           kpi.high           or 0,
             "medium":         kpi.medium         or 0,
             "low":            kpi.low            or 0,
+            "rank_count":     kpi.rank_count     or 0,
         },
         "project_stats": project_stats,
         "upcoming":       upcoming,

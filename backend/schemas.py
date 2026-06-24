@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Literal, Optional
 from datetime import datetime
 
-STATUS_VALUES = Literal['backlog', 'todo', 'planning', 'in_progress', 'review', 'testing', 'done', 'blocked', 'on_hold', 'waiting', 'cancelled']
+STATUS_VALUES = Literal['backlog', 'todo', 'up_next', 'planning', 'in_progress', 'review', 'testing', 'done', 'blocked', 'on_hold', 'waiting', 'cancelled']
 PRIORITY_VALUES = Literal['high', 'medium', 'low']
 PROJECT_TYPE_VALUES = Literal['project', 'activity']
 REF_TYPE_VALUES = Literal['url', 'note', 'doc']
@@ -64,6 +64,8 @@ class TaskBase(BaseModel):
     start_date: Optional[str] = None
     progress: int = 0
     notes: Optional[str] = ""
+    is_focus: bool = False
+    rank: Optional[int] = None
 
 class TaskCreate(TaskBase):
     pass
@@ -78,6 +80,8 @@ class TaskUpdate(BaseModel):
     start_date: Optional[str] = None
     progress: Optional[int] = None
     notes: Optional[str] = None
+    is_focus: Optional[bool] = None
+    rank: Optional[int] = None
 
 class TaskStatusUpdate(BaseModel):
     status: STATUS_VALUES
