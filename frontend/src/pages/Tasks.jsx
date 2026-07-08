@@ -1,15 +1,29 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, CheckCircle2, Circle, Clock, PauseCircle, XCircle, SlidersHorizontal, Trash, ArrowUpDown, ArrowUp, ArrowDown, Check, MoreHorizontal, HelpCircle, Archive, Lightbulb, Eye, FlaskConical, Ban, MinusCircle, ChevronDown, ChevronRight, Star, ArrowRight } from 'lucide-react'
+import { Search, CheckCircle2, Circle, Clock, PauseCircle, XCircle, SlidersHorizontal, Trash, ArrowUpDown, ArrowUp, ArrowDown, Check, MoreHorizontal, HelpCircle, Archive, Lightbulb, Eye, FlaskConical, Ban, MinusCircle, ChevronDown, ChevronRight, Star, ArrowRight, StickyNote, Plus, GripHorizontal, Bot, Loader2 } from 'lucide-react'
 import { getTasks, updateTask, updateTaskStatus, deleteTask, deleteAllTasks, bulkDeleteTasks, bulkUpdateTasks } from '../api/tasks'
 import { getProjects } from '../api/projects'
-import { StatusBadge, PriorityBadge, ProjectDot, STATUS_CONFIG, STATUS_GROUPS } from '../components/Badge'
+import { getProjectNotes, createNote, updateNote, deleteNote, reorderNotes } from '../api/notes'
+import { getProjectLogs, createProjectLog, deleteProjectLog } from '../api/projectLogs'
+import RichTextEditor from '../components/RichTextEditor'
+import { PriorityBadge, ProjectDot, STATUS_CONFIG, STATUS_GROUPS } from '../components/Badge'
 import TaskDrawer from '../components/TaskDrawer'
 import QuickAdd from '../components/QuickAdd'
 import { useSettings } from '../context/SettingsContext'
 import { format, parseISO, isToday, isTomorrow, isPast, differenceInDays } from 'date-fns'
 import clsx from 'clsx'
+
+const NOTE_COLORS = [
+  { name: 'Zinc',   accent: '#a1a1aa' },
+  { name: 'Red',    accent: '#fca5a5' },
+  { name: 'Orange', accent: '#fdba74' },
+  { name: 'Amber',  accent: '#fcd34d' },
+  { name: 'Green',  accent: '#6ee7b7' },
+  { name: 'Sky',    accent: '#7dd3fc' },
+  { name: 'Violet', accent: '#c4b5fd' },
+  { name: 'Pink',   accent: '#f9a8d4' },
+]
 
 const STATUS_ICONS = {
   backlog:     <Archive      size={15} className="text-zinc-600"    />,
@@ -26,6 +40,37 @@ const STATUS_ICONS = {
   cancelled:   <MinusCircle  size={15} className="text-zinc-700"    />,
 }
 
+const STATUS_BORDER = {
+  backlog:     '#52525b', todo:        '#71717a', up_next:     '#fbbf24',
+  planning:    '#38bdf8', in_progress: '#818cf8', review:      '#a78bfa',
+  testing:     '#22d3ee', done:        '#34d399', blocked:     '#fb7185',
+  on_hold:     '#fbbf24', waiting:     '#fb923c', cancelled:   '#3f3f46',
+}
+const STATUS_ROW_BG = {
+  backlog:     'rgba(82,82,91,0.03)',    todo:        'rgba(113,113,122,0.03)',
+  up_next:     'rgba(251,191,36,0.04)',  planning:    'rgba(56,189,248,0.04)',
+  in_progress: 'rgba(129,140,248,0.04)',review:      'rgba(167,139,250,0.04)',
+  testing:     'rgba(34,211,238,0.04)', done:        'rgba(52,211,153,0.03)',
+  blocked:     'rgba(251,113,133,0.04)',on_hold:     'rgba(251,191,36,0.04)',
+  waiting:     'rgba(251,146,60,0.04)', cancelled:   'rgba(63,63,70,0.02)',
+}
+const STATUS_ROW_BG_HOVER = {
+  backlog:     'rgba(82,82,91,0.06)',    todo:        'rgba(113,113,122,0.06)',
+  up_next:     'rgba(251,191,36,0.07)',  planning:    'rgba(56,189,248,0.07)',
+  in_progress: 'rgba(129,140,248,0.07)',review:      'rgba(167,139,250,0.07)',
+  testing:     'rgba(34,211,238,0.07)', done:        'rgba(52,211,153,0.06)',
+  blocked:     'rgba(251,113,133,0.07)',on_hold:     'rgba(251,191,36,0.07)',
+  waiting:     'rgba(251,146,60,0.07)', cancelled:   'rgba(63,63,70,0.04)',
+}
+const STATUS_PILL_STYLE = {
+  backlog:     { bg: '#3f3f46', color: '#a1a1aa' }, todo:        { bg: '#3f3f46', color: '#a1a1aa' },
+  up_next:     { bg: '#fbbf24', color: '#18181b' }, planning:    { bg: '#38bdf8', color: '#18181b' },
+  in_progress: { bg: '#818cf8', color: '#fff'    }, review:      { bg: '#a78bfa', color: '#fff'    },
+  testing:     { bg: '#22d3ee', color: '#18181b' }, done:        { bg: '#34d399', color: '#18181b' },
+  blocked:     { bg: '#fb7185', color: '#fff'    }, on_hold:     { bg: '#fbbf24', color: '#18181b' },
+  waiting:     { bg: '#fb923c', color: '#fff'    }, cancelled:   { bg: '#27272a', color: '#71717a' },
+}
+
 const STATUS_DESCRIPTIONS = {
   backlog:     'Not yet scheduled or prioritized',
   todo:        'Ready to start, but not urgent',
@@ -38,7 +83,7 @@ const STATUS_DESCRIPTIONS = {
 
 const STATUS_PICKER_OPTIONS = ['backlog', 'todo', 'up_next', 'in_progress', 'review', 'done', 'cancelled']
 
-function StatusPicker({ taskId, currentStatus, onStatusChange }) {
+function StatusPicker({ taskId, currentStatus, onStatusChange, variant = 'icon' }) {
   const [open, setOpen] = useState(false)
   const [pos,  setPos]  = useState({ top: 0, left: 0 })
   const btnRef = useRef(null)
@@ -62,8 +107,23 @@ function StatusPicker({ taskId, currentStatus, onStatusChange }) {
 
   return (
     <>
-      <button ref={btnRef} onClick={handleOpen} className="hover:scale-110 transition-transform" title="Change status">
-        {STATUS_ICONS[currentStatus] ?? STATUS_ICONS.todo}
+      <button ref={btnRef} onClick={handleOpen} title="Change status"
+        className={variant === 'pill' ? 'cursor-pointer' : 'hover:scale-110 transition-transform'}
+      >
+        {variant === 'pill' ? (() => {
+          const s   = STATUS_PILL_STYLE[currentStatus] ?? STATUS_PILL_STYLE.todo
+          const cfg = STATUS_CONFIG[currentStatus] ?? STATUS_CONFIG.todo
+          return (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', minWidth: 88,
+              padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 600,
+              letterSpacing: '0.04em', whiteSpace: 'nowrap',
+              background: s.bg, color: s.color,
+            }}>
+              {cfg.label}
+            </span>
+          )
+        })() : (STATUS_ICONS[currentStatus] ?? STATUS_ICONS.todo)}
       </button>
 
       {open && (
@@ -102,101 +162,6 @@ function StatusPicker({ taskId, currentStatus, onStatusChange }) {
   )
 }
 
-function hexToRgba(hex, a) {
-  const h = (hex || '#f59e0b').replace('#', '')
-  const r = parseInt(h.slice(0,2), 16)
-  const g = parseInt(h.slice(2,4), 16)
-  const b = parseInt(h.slice(4,6), 16)
-  return `rgba(${r},${g},${b},${a})`
-}
-// Visual hierarchy: #1 = solid filled, #2 = tinted, #3 = ghost
-function rankBadgeStyle(color, rank) {
-  const c = color || '#f59e0b'
-  if (rank === 1) return { background: c, color: '#fff', border: `1px solid ${c}` }
-  if (rank === 2) return { background: hexToRgba(c, 0.18), color: c, border: `1px solid ${hexToRgba(c, 0.40)}` }
-  return { background: hexToRgba(c, 0.08), color: hexToRgba(c, 0.55), border: `1px solid ${hexToRgba(c, 0.20)}` }
-}
-const RANK_ROW_A    = { 1: 0.12, 2: 0.05, 3: 0.02 }
-const RANK_HOVER_A  = { 1: 0.16, 2: 0.08, 3: 0.04 }
-const RANK_BORDER_A = { 1: 1.00, 2: 0.45, 3: 0.20 }
-
-function RankPicker({ currentRank, projectColor = '#f59e0b', onRankChange, asBadge = false, alwaysVisible = false }) {
-  const [open, setOpen] = useState(false)
-  const [pos,  setPos]  = useState({ top: 0, left: 0 })
-  const btnRef = useRef(null)
-  const popRef = useRef(null)
-
-  useEffect(() => {
-    if (!open) return
-    function handleClick(e) {
-      if (!popRef.current?.contains(e.target) && !btnRef.current?.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
-
-  function handleOpen(e) {
-    e.stopPropagation()
-    const rect = btnRef.current.getBoundingClientRect()
-    const popupW = 152
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - popupW - 8))
-    setPos({ top: rect.bottom + 4, left })
-    setOpen(o => !o)
-  }
-
-  return (
-    <>
-      <button
-        ref={btnRef}
-        onClick={handleOpen}
-        title={currentRank ? `Rank #${currentRank} — click to change` : 'Set rank'}
-        className={clsx(
-          asBadge && currentRank
-            ? 'inline-flex items-center text-[10px] font-black px-2 py-0.5 rounded shrink-0 transition-opacity hover:opacity-75 border-0 cursor-pointer'
-            : currentRank
-            ? 'w-6 h-6 flex items-center justify-center rounded text-[11px] font-black transition-all leading-none'
-            : alwaysVisible
-            ? 'text-[14px] font-normal transition-colors text-zinc-700 hover:text-zinc-500 leading-none'
-            : 'w-6 h-6 flex items-center justify-center rounded text-[11px] font-black transition-all leading-none opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-amber-400'
-        )}
-        style={asBadge && currentRank ? rankBadgeStyle(projectColor, currentRank) : currentRank ? { color: projectColor } : {}}
-      >
-        {currentRank ? `#${currentRank}` : alwaysVisible ? '—' : <Star size={13} />}
-      </button>
-
-      {open && (
-        <div
-          ref={popRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 200 }}
-          className="flex items-center gap-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-2xl p-1.5"
-          onClick={e => e.stopPropagation()}
-        >
-          {[1, 2, 3].map(n => (
-            <button
-              key={n}
-              onClick={() => { onRankChange(currentRank === n ? null : n); setOpen(false) }}
-              className="w-7 h-7 rounded-md text-[11px] font-black border transition-all"
-              style={currentRank === n
-                ? { ...rankBadgeStyle(projectColor, n), borderRadius: 6 }
-                : { color: '#71717a', borderColor: 'transparent' }
-              }
-            >
-              #{n}
-            </button>
-          ))}
-          <div className="w-px h-4 bg-zinc-700 mx-0.5" />
-          <button
-            onClick={() => { onRankChange(null); setOpen(false) }}
-            title="Remove rank"
-            className="w-7 h-7 rounded-md text-xs text-zinc-500 hover:text-red-400 border border-transparent hover:border-zinc-700 transition-all flex items-center justify-center"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-    </>
-  )
-}
 
 const STATUS_CYCLE = {
   backlog:     'todo',
@@ -213,7 +178,7 @@ const STATUS_CYCLE = {
   cancelled:   'backlog',
 }
 
-function formatDue(dateStr) {
+function formatDue(dateStr, isDone = false) {
   if (!dateStr) return null
   try {
     const d    = parseISO(dateStr)
@@ -222,7 +187,7 @@ function formatDue(dateStr) {
     if (isToday(d))     return { label: 'Today',         overdue: false }
     if (isTomorrow(d))  return { label: 'Tomorrow',      overdue: false }
     if (diff > 1 && diff <= 7) return { label: `In ${diff}d`,    overdue: false }
-    if (diff < 0)       return { label: `${-diff}d overdue`,     overdue: true  }
+    if (diff < 0)       return { label: isDone ? format(d, 'MMM d') : `${-diff}d overdue`, overdue: !isDone }
     return { label: format(d, 'MMM d'), overdue: false }
   } catch {
     return { label: dateStr, overdue: false }
@@ -238,16 +203,18 @@ export default function Tasks() {
   const [quickAddOpen, setQuickAddOpen]   = useState(false)
   const [menuOpen,       setMenuOpen]       = useState(false)
   const [showCompleted,  setShowCompleted]  = useState(false)
-  const [rankedOnly,     setRankedOnly]     = useState(false)
   const menuRef = useRef(null)
+  const resizeHandleRef  = useRef(null)
+  const taskListWidthRef = useRef(280)
+  const [taskListWidth, setTaskListWidth] = useState(280)
 
   const [colWidths, setColWidths] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('pragma_task_col_widths') || 'null') || { project: 130, priority: 90, status: 90, due: 80 } }
-    catch { return { project: 130, priority: 90, status: 90, due: 80 } }
+    try { return JSON.parse(localStorage.getItem('pragma_task_col_widths') || 'null') || { project: 130, priority: 90, due: 80 } }
+    catch { return { project: 130, priority: 90, due: 80 } }
   })
 
   const gridStyle = {
-    gridTemplateColumns: `20px 28px 40px 1fr ${colWidths.project}px ${colWidths.priority}px ${colWidths.status}px ${colWidths.due}px 72px`
+    gridTemplateColumns: `20px 40px 100px 1fr ${colWidths.project}px ${colWidths.priority}px ${colWidths.due}px 72px`
   }
 
   function startColResize(e, col) {
@@ -255,7 +222,7 @@ export default function Tasks() {
     e.stopPropagation()
     const startX = e.clientX
     const startW = colWidths[col]
-    const mins   = { project: 80, priority: 65, status: 65, due: 55 }
+    const mins   = { project: 80, priority: 65, due: 55 }
     function onMove(ev) {
       const w = Math.max(mins[col], Math.min(320, startW + ev.clientX - startX))
       setColWidths(prev => {
@@ -291,6 +258,31 @@ export default function Tasks() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [menuOpen])
 
+  // Resize: task list panel
+  useEffect(() => {
+    const handle = resizeHandleRef.current
+    if (!handle) return
+    let dragging = false, startX = 0, startW = 0
+    function onDown(e) {
+      dragging = true; startX = e.clientX; startW = taskListWidthRef.current
+      document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'
+    }
+    function onMove(e) {
+      if (!dragging) return
+      const w = Math.min(520, Math.max(180, startW + (e.clientX - startX)))
+      taskListWidthRef.current = w; setTaskListWidth(w)
+    }
+    function onUp() { dragging = false; document.body.style.cursor = ''; document.body.style.userSelect = '' }
+    handle.addEventListener('mousedown', onDown)
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      handle.removeEventListener('mousedown', onDown)
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [])
+
   function openTask(task) {
     setQuickAddOpen(false)
     setSelectedTask(task)
@@ -320,6 +312,9 @@ export default function Tasks() {
 
   // Sync searchInput when URL changes externally (e.g., "Clear filters")
   useEffect(() => { setSearchInput(search) }, [search])
+
+  // Clear task drawer and selection when project changes
+  useEffect(() => { setSelectedTask(null) }, [projectFilter])
 
   // Clear selection when filters change
   useEffect(() => { setSelectedIds(new Set()) }, [projectFilter, statusFilter, priorityFilter, dueFilter, search])
@@ -417,9 +412,8 @@ export default function Tasks() {
     const base = isCompletedFilter
       ? sortedTasks
       : sortedTasks.filter(t => t.status !== 'done' && t.status !== 'cancelled')
-    if (!rankedOnly) return base
-    return [...base.filter(t => t.rank != null)].sort((a, b) => a.rank - b.rank)
-  }, [sortedTasks, isCompletedFilter, rankedOnly])
+    return base
+  }, [sortedTasks, isCompletedFilter])
 
   const completedTasks = useMemo(() =>
     isCompletedFilter
@@ -470,13 +464,129 @@ export default function Tasks() {
     },
   })
 
-  const rankMutation = useMutation({
-    mutationFn: ({ id, rank }) => updateTask(id, { rank }),
+  const favoriteMutation = useMutation({
+    mutationFn: ({ id, is_focus }) => updateTask(id, { is_focus }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
+  })
+
+  // ── Notes + Activity tabs (shown when a project filter is active) ──
+  const [activeView,      setActiveView]      = useState('tasks') // 'tasks' | 'notes' | 'activity'
+  const [selectedPageId,  setSelectedPageId]  = useState(null)
+  const [pageTitle,       setPageTitle]       = useState('')
+  const [pageBody,        setPageBody]        = useState('')
+  const [localNotes,      setLocalNotes]      = useState([])
+  const [dragPageId,      setDragPageId]      = useState(null)
+  const [dragOverPageId,  setDragOverPageId]  = useState(null)
+
+  // Reset to tasks view when project changes
+  useEffect(() => { setActiveView('tasks'); setSelectedPageId(null) }, [projectFilter])
+
+  const { data: notes = [] } = useQuery({
+    queryKey: ['notes', projectFilter],
+    queryFn:  () => getProjectNotes(Number(projectFilter)),
+    enabled:  !!projectFilter,
+  })
+
+  // ── Activity log state ─────────────────────────────────────────
+  const [activityText, setActivityText] = useState('')
+
+  const { data: projectLogs = [], isLoading: logsLoading } = useQuery({
+    queryKey: ['projectLogs', projectFilter],
+    queryFn:  () => getProjectLogs(Number(projectFilter)),
+    enabled:  !!projectFilter,
+  })
+
+  const addLogMutation = useMutation({
+    mutationFn: (content) => createProjectLog(Number(projectFilter), { content, author: 'user' }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['stats'] })
+      qc.invalidateQueries({ queryKey: ['projectLogs', projectFilter] })
+      setActivityText('')
     },
   })
+
+  const deleteLogMutation = useMutation({
+    mutationFn: (id) => deleteProjectLog(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projectLogs', projectFilter] }),
+  })
+
+  // Sync local order; auto-select first page on first load
+  useEffect(() => {
+    if (dragPageId !== null) return
+    setLocalNotes(notes)
+    if (notes.length > 0 && !selectedPageId) {
+      setSelectedPageId(notes[0].id)
+      setPageTitle(notes[0].title)
+      setPageBody(notes[0].body)
+    }
+  }, [notes, dragPageId])
+
+  const selectedPage = localNotes.find(n => n.id === selectedPageId) ?? null
+
+  const createNoteMutation = useMutation({
+    mutationFn: (data) => createNote(Number(projectFilter), data),
+    onSuccess: (newNote) => {
+      qc.invalidateQueries({ queryKey: ['notes', projectFilter] })
+      setSelectedPageId(newNote.id)
+      setPageTitle(newNote.title)
+      setPageBody(newNote.body)
+    },
+  })
+  const updateNoteMutation = useMutation({
+    mutationFn: ({ id, data }) => updateNote(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notes', projectFilter] }),
+  })
+  const deleteNoteMutation = useMutation({
+    mutationFn: (id) => deleteNote(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notes', projectFilter] })
+      setSelectedPageId(null)
+    },
+  })
+  const reorderMutation = useMutation({
+    mutationFn: (ids) => reorderNotes(Number(projectFilter), ids),
+  })
+
+  function selectPage(note) {
+    if (selectedPageId && selectedPageId !== note.id) {
+      updateNoteMutation.mutate({ id: selectedPageId, data: { title: pageTitle, body: pageBody } })
+    }
+    setSelectedPageId(note.id)
+    setPageTitle(note.title)
+    setPageBody(note.body)
+  }
+
+  function addNewPage() { createNoteMutation.mutate({ title: '', body: '', color: '#a1a1aa' }) }
+
+  function savePage() {
+    if (!selectedPageId) return
+    updateNoteMutation.mutate({ id: selectedPageId, data: { title: pageTitle, body: pageBody } })
+  }
+
+  function changePageColor(color) {
+    if (!selectedPageId) return
+    updateNoteMutation.mutate({ id: selectedPageId, data: { color } })
+    setLocalNotes(prev => prev.map(n => n.id === selectedPageId ? { ...n, color } : n))
+  }
+
+  function handlePageDrop(targetId) {
+    if (!dragPageId || dragPageId === targetId) return
+    const reordered = [...localNotes]
+    const fromIdx = reordered.findIndex(n => n.id === dragPageId)
+    const toIdx   = reordered.findIndex(n => n.id === targetId)
+    const [moved] = reordered.splice(fromIdx, 1)
+    reordered.splice(toIdx, 0, moved)
+    setLocalNotes(reordered)
+    reorderMutation.mutate(reordered.map(n => n.id))
+  }
+
+  function openNotesTab() {
+    setActiveView('notes')
+    if (notes.length > 0 && !selectedPageId) {
+      setSelectedPageId(notes[0].id)
+      setPageTitle(notes[0].title)
+      setPageBody(notes[0].body)
+    }
+  }
 
   function toggleSelect(id) {
     setSelectedIds((prev) => {
@@ -494,7 +604,7 @@ export default function Tasks() {
 
   // ── Derived values ────────────────────────────────────────────────
   const activeProject = projectFilter ? projectMap[Number(projectFilter)] : null
-  const pageTitle     = activeProject ? activeProject.name : 'All Tasks'
+  const headerTitle   = activeProject ? activeProject.name : 'All Tasks'
   const hasFilters    = search || projectFilter || statusFilter || priorityFilter || dueFilter
 
   const deleteAllLabel = activeProject
@@ -511,475 +621,406 @@ export default function Tasks() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-zinc-800 shrink-0">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2.5">
-            {activeProject && (
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: activeProject.color }} />
-            )}
-            <h1 className="text-base font-bold text-zinc-100">{pageTitle}</h1>
-            <span className="text-xs text-zinc-600 bg-zinc-800 px-2 py-0.5 rounded-full">
-              {activeTasks.length}
-            </span>
-          </div>
 
-          <div className="flex items-center gap-3">
-            {hasFilters && (
-              <button
-                onClick={clearFilters}
-                className="text-xs text-zinc-500 hover:text-zinc-300 flex items-center gap-1"
-              >
-                <XCircle size={12} /> Clear filters
-              </button>
-            )}
-            {selectedIds.size > 0 && (
-              <div className="flex items-center gap-2 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5">
-                <span className="text-xs text-zinc-400 font-medium shrink-0">{selectedIds.size} selected</span>
-                <div className="w-px h-3 bg-zinc-700" />
-                <select
-                  className="bg-transparent text-xs text-zinc-300 focus:outline-none cursor-pointer"
-                  defaultValue=""
-                  onChange={e => {
-                    if (!e.target.value) return
-                    bulkUpdateMutation.mutate({ ids: [...selectedIds], data: { status: e.target.value } })
-                    e.target.value = ''
-                  }}
-                >
-                  <option value="" disabled>Set status…</option>
-                  {STATUS_GROUPS.map(g => (
-                    <optgroup key={g.label} label={g.label}>
-                      {g.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </optgroup>
-                  ))}
-                </select>
-                <div className="w-px h-3 bg-zinc-700" />
-                <select
-                  className="bg-transparent text-xs text-zinc-300 focus:outline-none cursor-pointer"
-                  defaultValue=""
-                  onChange={e => {
-                    if (!e.target.value) return
-                    bulkUpdateMutation.mutate({ ids: [...selectedIds], data: { priority: e.target.value } })
-                    e.target.value = ''
-                  }}
-                >
-                  <option value="" disabled>Set priority…</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-                <div className="w-px h-3 bg-zinc-700" />
-                <button
-                  onClick={() => {
-                    if (confirm(`Delete ${selectedIds.size} selected task${selectedIds.size > 1 ? 's' : ''}?\n\nThis cannot be undone.`))
-                      bulkDeleteMutation.mutate([...selectedIds])
-                  }}
-                  disabled={bulkDeleteMutation.isPending}
-                  className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-40"
-                >
-                  <Trash size={11} /> {bulkDeleteMutation.isPending ? 'Deleting…' : 'Delete'}
+      {/* Project-level tab bar — only when a project is active */}
+      {activeProject && (
+        <div className="flex items-stretch border-b border-zinc-800 bg-zinc-900 shrink-0" style={{ height: 38 }}>
+          <button onClick={() => setActiveView('tasks')}
+            className={`flex items-center gap-2 px-5 text-[12px] font-medium transition-colors border-t-2 ${activeView === 'tasks' ? 'border-indigo-500 bg-zinc-950 text-zinc-100' : 'border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60'}`}>
+            Tasks
+          </button>
+          <button onClick={openNotesTab}
+            className={`flex items-center gap-2 px-5 text-[12px] font-medium transition-colors border-t-2 ${activeView === 'notes' ? 'border-indigo-500 bg-zinc-950 text-zinc-100' : 'border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60'}`}>
+            Notes
+          </button>
+        </div>
+      )}
+
+      {/* ── MAIN HORIZONTAL SPLIT ── */}
+      <div className="flex flex-1 overflow-hidden min-h-0">
+
+        {/* ── TASKS VIEW ── */}
+        {(!activeProject || activeView === 'tasks') && (
+          <>
+            {/* Compact task list panel */}
+            <div style={{ width: taskListWidth }} className="shrink-0 flex flex-col bg-[#0f0f12] border-r border-zinc-800 overflow-hidden">
+
+              {/* Panel header */}
+              <div className="px-3 py-2.5 border-b border-zinc-800 flex items-center justify-between shrink-0">
+                <div>
+                  <div className="text-[13px] font-semibold text-zinc-200">{headerTitle}</div>
+                  <div className="text-[11px] text-zinc-500">{activeTasks.length} active</div>
+                </div>
+                <div className="flex items-center gap-0.5">
+                  {hasFilters && (
+                    <button onClick={clearFilters} title="Clear filters"
+                      className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors">
+                      <XCircle size={12} />
+                    </button>
+                  )}
+                  {selectedIds.size > 0 && (
+                    <button
+                      onClick={() => { if (confirm(`Delete ${selectedIds.size} task(s)?`)) bulkDeleteMutation.mutate([...selectedIds]) }}
+                      className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors" title="Delete selected">
+                      <Trash size={12} />
+                    </button>
+                  )}
+                  <button onClick={() => setQuickAddOpen(o => !o)} title="Add task (N)"
+                    className="p-1.5 text-zinc-500 hover:text-orange-400 transition-colors">
+                    <Plus size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Search */}
+              <div className="px-2 py-2 border-b border-zinc-800 shrink-0">
+                <div className="relative">
+                  <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none" />
+                  <input
+                    value={searchInput}
+                    onChange={e => setSearchInput(e.target.value)}
+                    placeholder="Search tasks…"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-md pl-7 pr-2 py-1 text-[11.5px] text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-zinc-700 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Task list */}
+              <div className="flex-1 overflow-y-auto">
+                {quickAddOpen && (
+                  <div className="px-2 pt-2 shrink-0">
+                    <QuickAdd
+                      defaultProjectId={projectFilter ? Number(projectFilter) : null}
+                      open={quickAddOpen}
+                      onOpen={() => setQuickAddOpen(true)}
+                      onClose={() => setQuickAddOpen(false)}
+                      onCreated={t => { setSelectedTask(t); setQuickAddOpen(false) }}
+                    />
+                  </div>
+                )}
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8 text-zinc-700 text-xs">Loading…</div>
+                ) : activeTasks.length === 0 && !quickAddOpen ? (
+                  <div className="flex flex-col items-center justify-center py-10 gap-1 text-zinc-700">
+                    <p className="text-xs">No tasks found.</p>
+                    {hasFilters && (
+                      <button onClick={clearFilters} className="text-[11px] text-zinc-600 hover:text-zinc-400 underline">
+                        Clear filters
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <CompactTaskList
+                    tasks={activeTasks}
+                    completedTasks={completedTasks}
+                    showCompleted={showCompleted}
+                    setShowCompleted={setShowCompleted}
+                    selectedTask={selectedTask}
+                    onSelect={openTask}
+                    isCompletedFilter={isCompletedFilter}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Resize handle */}
+            <div ref={resizeHandleRef}
+              className="w-1 shrink-0 bg-zinc-800 hover:bg-violet-500 active:bg-violet-400 cursor-col-resize transition-colors" />
+
+            {/* Task detail */}
+            <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-[#0b0b0e]">
+              {selectedTask ? (
+                <TaskDrawer
+                  task={selectedTask}
+                  onClose={() => setSelectedTask(null)}
+                  onDeleted={() => setSelectedTask(null)}
+                  inline
+                />
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 text-zinc-700">
+                  <CheckCircle2 size={36} className="opacity-15" />
+                  <p className="text-sm">Select a task to view details</p>
+                  <p className="text-xs text-zinc-800">Press N to add a new task</p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── NOTES VIEW ── */}
+        {activeProject && activeView === 'notes' && (
+          <div className="flex flex-1 overflow-hidden min-h-0">
+            <div className="w-[210px] shrink-0 border-r border-zinc-800 bg-zinc-900/40 flex flex-col">
+              <div className="flex items-center justify-between px-3 py-3 border-b border-zinc-800 shrink-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Pages</span>
+                <button onClick={addNewPage} disabled={createNoteMutation.isPending}
+                  className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 px-2 py-1 rounded-md transition-colors disabled:opacity-40">
+                  <Plus size={11} /> New page
                 </button>
               </div>
-            )}
-            {/* ⋯ overflow menu */}
-            <div ref={menuRef} className="relative">
-              <button
-                onClick={() => setMenuOpen(o => !o)}
-                className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
-                title="More options"
-              >
-                <MoreHorizontal size={15} />
-              </button>
-              {menuOpen && (
-                <div className="absolute right-0 top-full mt-1 w-52 bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl z-20 py-1 overflow-hidden">
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false)
-                      if (confirm(`⚠️ ${deleteAllLabel}?\n\nThis cannot be undone.`))
-                        deleteAllMutation.mutate()
-                    }}
-                    disabled={deleteAllMutation.isPending || tasks.length === 0}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              <div className="flex-1 overflow-y-auto py-1">
+                {localNotes.length === 0 ? (
+                  <div className="flex items-center justify-center h-20 text-[11px] text-zinc-700">No pages yet</div>
+                ) : localNotes.map(note => (
+                  <div
+                    key={note.id}
+                    draggable
+                    onClick={() => selectPage(note)}
+                    onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setDragPageId(note.id) }}
+                    onDragEnd={() => { setDragPageId(null); setDragOverPageId(null) }}
+                    onDragOver={e => { e.preventDefault(); setDragOverPageId(note.id) }}
+                    onDrop={e => { e.preventDefault(); handlePageDrop(note.id) }}
+                    className={`flex items-center gap-0 cursor-pointer group transition-colors border-l-[3px] select-none ${
+                      selectedPageId === note.id ? 'bg-zinc-800/70' :
+                      dragOverPageId === note.id && dragPageId !== note.id ? 'bg-indigo-500/10' :
+                      'hover:bg-zinc-800/40'
+                    }`}
+                    style={{ borderLeftColor: selectedPageId === note.id ? note.color : 'transparent' }}
                   >
-                    <Trash size={12} />
-                    {deleteAllMutation.isPending ? 'Deleting…' : deleteAllLabel}
+                    <span className="pl-2 pr-1 text-zinc-700 group-hover:text-zinc-500 transition-colors cursor-grab">
+                      <GripHorizontal size={12} />
+                    </span>
+                    <div className="w-[3px] h-7 rounded-sm mx-2 shrink-0" style={{ background: note.color }} />
+                    <div className="flex-1 min-w-0 pr-2 py-2.5">
+                      <div className={`text-[12px] truncate leading-snug ${selectedPageId === note.id ? 'text-zinc-100' : 'text-zinc-400'}`}>
+                        {note.title || <span className="text-zinc-600 italic">Untitled</span>}
+                      </div>
+                      <div className="text-[10px] text-zinc-600 mt-0.5">
+                        {note.created_at ? format(parseISO(note.created_at), 'MMM d') : ''}
+                      </div>
+                    </div>
+                    <button
+                      onClick={e => { e.stopPropagation(); if (confirm('Delete this page?')) deleteNoteMutation.mutate(note.id) }}
+                      className="opacity-0 group-hover:opacity-100 mr-2 p-1 text-zinc-600 hover:text-red-400 transition-all rounded shrink-0">
+                      <XCircle size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {selectedPage ? (
+              <div className="flex-1 flex flex-col overflow-hidden bg-zinc-950">
+                <div className="flex items-center gap-4 px-7 py-2.5 border-b border-zinc-800 shrink-0">
+                  <div className="flex-1 text-[11px] text-zinc-600 truncate">
+                    <span className="text-zinc-500">{activeProject.name}</span>
+                    <span className="mx-1.5 text-zinc-700">›</span>
+                    <span className="text-zinc-400">{selectedPage.title || 'Untitled'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {NOTE_COLORS.map(c => (
+                      <button key={c.accent} onClick={() => changePageColor(c.accent)} title={c.name}
+                        className="w-3.5 h-3.5 rounded-full border-2 transition-all"
+                        style={{ background: c.accent, borderColor: selectedPage.color === c.accent ? '#fff' : 'transparent', transform: selectedPage.color === c.accent ? 'scale(1.25)' : 'scale(1)' }} />
+                    ))}
+                  </div>
+                  <span className="text-[10px] text-zinc-700 shrink-0">
+                    {updateNoteMutation.isPending ? 'Saving…' : 'Saved'}
+                  </span>
+                </div>
+                <div className="flex-1 overflow-y-auto flex flex-col px-10 py-8">
+                  <input
+                    key={selectedPageId + '-title'}
+                    defaultValue={pageTitle}
+                    onChange={e => setPageTitle(e.target.value)}
+                    onBlur={savePage}
+                    placeholder="Page title…"
+                    className="block w-full text-[26px] font-bold text-zinc-100 bg-transparent border-none outline-none caret-indigo-500 placeholder-zinc-700 mb-2"
+                    style={{ fontFamily: 'inherit' }}
+                  />
+                  <div className="text-[11px] text-zinc-700 mb-6 pb-5 border-b border-zinc-800/60">
+                    {selectedPage.created_at ? format(parseISO(selectedPage.created_at), 'MMM d, yyyy · HH:mm') : ''}
+                  </div>
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <RichTextEditor
+                      key={selectedPageId + '-body'}
+                      content={selectedPage.body || ''}
+                      onUpdate={setPageBody}
+                      onBlur={savePage}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center bg-zinc-950 text-zinc-700">
+                <div className="text-center">
+                  <StickyNote size={32} className="mx-auto mb-3 opacity-20" />
+                  <p className="text-sm">Create a new page to get started</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── ACTIVITY VIEW ── */}
+        {activeProject && activeView === 'activity' && (
+          <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-zinc-950">
+            <div className="flex-1 overflow-y-auto px-8 py-6 max-w-3xl w-full mx-auto">
+              <h2 className="text-sm font-semibold text-zinc-400 mb-1">Project Activity Log</h2>
+              <p className="text-[11px] text-zinc-600 mb-6">A shared timeline for notes, decisions, and updates — written by you or Claude.</p>
+              <div className="flex gap-3 mb-8">
+                <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-[10px] font-bold text-white">Y</span>
+                </div>
+                <div className="flex-1">
+                  <textarea
+                    value={activityText}
+                    onChange={e => setActivityText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && activityText.trim()) addLogMutation.mutate(activityText.trim()) }}
+                    rows={3}
+                    placeholder="Add a note, decision, or update… (Ctrl+Enter to save)"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+                  />
+                  <button
+                    onClick={() => { if (activityText.trim()) addLogMutation.mutate(activityText.trim()) }}
+                    disabled={!activityText.trim() || addLogMutation.isPending}
+                    className="mt-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors">
+                    {addLogMutation.isPending ? 'Adding…' : 'Add Entry'}
                   </button>
+                </div>
+              </div>
+              {logsLoading ? (
+                <div className="flex items-center justify-center py-12 text-zinc-600">
+                  <Loader2 size={16} className="animate-spin mr-2" /> Loading…
+                </div>
+              ) : projectLogs.length === 0 ? (
+                <div className="text-center py-12 text-zinc-700">
+                  <Bot size={28} className="mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No activity logged yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {projectLogs.map(log => (
+                    <div key={log.id} className="flex gap-3 group">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${log.author === 'claude' ? 'bg-violet-700' : 'bg-indigo-600'}`}>
+                        {log.author === 'claude' ? <Bot size={12} className="text-white" /> : <span className="text-[10px] font-bold text-white">Y</span>}
+                      </div>
+                      <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className={`text-[11px] font-semibold ${log.author === 'claude' ? 'text-violet-400' : 'text-indigo-400'}`}>
+                            {log.author === 'claude' ? 'Claude' : 'You'}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-zinc-600">{format(parseISO(log.created_at), 'MMM d, yyyy · h:mm a')}</span>
+                            <button onClick={() => deleteLogMutation.mutate(log.id)}
+                              className="opacity-0 group-hover:opacity-100 p-0.5 text-zinc-700 hover:text-red-400 transition-all rounded">
+                              <XCircle size={12} />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">{log.content}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Filter bar */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setRankedOnly(o => !o)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors shrink-0 ${
-              rankedOnly
-                ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
-                : 'border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600'
-            }`}
-          >
-            <Star size={11} className={rankedOnly ? 'fill-amber-400 text-amber-400' : ''} />
-            Ranked
-          </button>
+      </div>{/* end horizontal split */}
+    </div>
+  )
+}
 
-          <div className="relative flex-1 min-w-[180px]">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-            <input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search tasks…"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-indigo-500 transition-colors"
-            />
-          </div>
+const COMPACT_CHIP = {
+  in_progress: { color: '#818cf8', label: 'In Progress', tint: 'rgba(129,140,248,.05)' },
+  up_next:     { color: '#fbbf24', label: 'Up Next',     tint: 'rgba(251,191,36,.04)'  },
+  todo:        { color: '#71717a', label: 'To Do',       tint: 'rgba(113,113,122,.03)' },
+  blocked:     { color: '#f87171', label: 'Blocked',     tint: 'rgba(248,113,133,.05)' },
+  on_hold:     { color: '#f59e0b', label: 'On Hold',     tint: 'rgba(245,158,11,.04)'  },
+  waiting:     { color: '#fb923c', label: 'Waiting',     tint: 'rgba(251,146,60,.04)'  },
+  planning:    { color: '#38bdf8', label: 'Planning',    tint: 'rgba(56,189,248,.04)'  },
+  review:      { color: '#a78bfa', label: 'Review',      tint: 'rgba(167,139,250,.04)' },
+  testing:     { color: '#22d3ee', label: 'Testing',     tint: 'rgba(34,211,238,.04)'  },
+  backlog:     { color: '#71717a', label: 'Backlog',     tint: 'rgba(113,113,122,.03)' },
+}
+const COMPACT_GROUP_ORDER = ['in_progress', 'up_next', 'todo', 'blocked', 'on_hold', 'waiting', 'planning', 'review', 'testing', 'backlog']
 
-          <select value={projectFilter} onChange={(e) => setFilter('project', e.target.value)} className={selectCls}>
-            <option value="">All Projects</option>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-
-          <select value={statusFilter} onChange={(e) => setFilter('status', e.target.value)} className={selectCls}>
-            <option value="">All Statuses</option>
-            {STATUS_GROUPS.map(g => (
-              <optgroup key={g.label} label={g.label}>
-                {g.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </optgroup>
-            ))}
-          </select>
-
-          <select value={priorityFilter} onChange={(e) => setFilter('priority', e.target.value)} className={selectCls}>
-            <option value="">All Priorities</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-
-          <select value={dueFilter} onChange={(e) => setFilter('due_filter', e.target.value)} className={selectCls}>
-            <option value="">All Dates</option>
-            <option value="today">Due Today</option>
-            <option value="week">This Week</option>
-            <option value="overdue">Overdue</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Task list */}
-      <div className="flex-1 overflow-auto">
-        <div className="px-6 pt-4">
-          <QuickAdd
-            defaultProjectId={projectFilter ? Number(projectFilter) : null}
-            open={quickAddOpen}
-            onOpen={() => { setQuickAddOpen(true); setSelectedTask(null) }}
-            onClose={() => setQuickAddOpen(false)}
-            onCreated={(newTask) => setSelectedTask(newTask)}
-          />
-        </div>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20 text-zinc-600 text-sm">Loading tasks…</div>
-        ) : sortedTasks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-zinc-600">
-            <SlidersHorizontal size={32} className="mb-3 opacity-30" />
-            <p className="text-sm">No tasks here yet.</p>
-            <p className="text-xs mt-1 text-zinc-700">
-              {hasFilters ? 'Try adjusting your filters.' : 'Press N or click "Add task" above to get started.'}
-            </p>
-          </div>
-        ) : (
-          <div className="px-6 pb-6">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-              {/* Column headers */}
-              <div className="grid gap-3 px-4 py-2.5 border-b border-zinc-800 text-[10px] font-semibold text-zinc-600 uppercase tracking-wider" style={gridStyle}>
-                <input
-                  type="checkbox"
-                  checked={activeTasks.length > 0 && selectedIds.size === activeTasks.length}
-                  ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < activeTasks.length }}
-                  onChange={toggleSelectAll}
-                  className="accent-indigo-500 cursor-pointer"
-                />
-                <span />
-                <span className="flex items-center justify-center"><Star size={9} /></span>
-                <button onClick={() => toggleSort('title')} className="flex items-center gap-1 hover:text-zinc-400 transition-colors text-left">Task <SortIcon field="title" /></button>
-                <span className="relative flex items-center select-none">
-                  Project
-                  <div className="absolute -right-2 top-0 bottom-0 w-4 cursor-col-resize z-10 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity" onMouseDown={e => startColResize(e, 'project')}>
-                    <div className="w-0.5 h-4 bg-zinc-400 rounded-full" />
-                  </div>
-                </span>
-                <button onClick={() => toggleSort('priority')} className="relative flex items-center gap-1 hover:text-zinc-400 transition-colors">
-                  Priority <SortIcon field="priority" />
-                  <div className="absolute -right-2 top-0 bottom-0 w-4 cursor-col-resize z-10 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity" onMouseDown={e => startColResize(e, 'priority')}>
-                    <div className="w-0.5 h-4 bg-zinc-400 rounded-full" />
-                  </div>
-                </button>
-                <button onClick={() => toggleSort('status')} className="relative flex items-center gap-1 hover:text-zinc-400 transition-colors">
-                  Status <SortIcon field="status" />
-                  <div className="absolute -right-2 top-0 bottom-0 w-4 cursor-col-resize z-10 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity" onMouseDown={e => startColResize(e, 'status')}>
-                    <div className="w-0.5 h-4 bg-zinc-400 rounded-full" />
-                  </div>
-                </button>
-                <button onClick={() => toggleSort('due_date')} className="relative flex items-center gap-1 hover:text-zinc-400 transition-colors">
-                  Due <SortIcon field="due_date" />
-                </button>
-                <span />
-              </div>
-
-              {activeTasks.map((task) => {
-                const proj       = task.project_id ? projectMap[task.project_id] : null
-                const due        = formatDue(task.due_date)
-                const isDone     = task.status === 'done' || task.status === 'cancelled'
-                const isCancelled = task.status === 'cancelled'
-                const isOverdue  = due?.overdue && !isDone
-                const isChecked  = selectedIds.has(task.id)
-
+function CompactTaskList({ tasks, completedTasks, showCompleted, setShowCompleted, selectedTask, onSelect, isCompletedFilter }) {
+  return (
+    <div className="pb-4">
+      {COMPACT_GROUP_ORDER.map(status => {
+        const group = tasks.filter(t => t.status === status)
+        if (!group.length) return null
+        const chip = COMPACT_CHIP[status] ?? COMPACT_CHIP.todo
+        // hex alpha 26 ≈ 15% opacity — appended to the 6-digit hex color
+        const dimColor = chip.color + '26'
+        return (
+          <div key={status} className="mb-1.5">
+            {/* Group header: colored label + fading divider + count badge */}
+            <div className="flex items-center gap-2 px-2.5 pt-3 pb-1.5">
+              <span className="text-[13px] font-bold uppercase tracking-wide shrink-0"
+                style={{ color: chip.color }}>
+                {chip.label}
+              </span>
+              <div className="flex-1 h-px" style={{ background: dimColor }} />
+              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+                style={{ background: dimColor, color: chip.color }}>
+                {group.length}
+              </span>
+            </div>
+            {/* Group body: left border accent + subtle tint background */}
+            <div style={{ borderLeft: `2px solid ${chip.color}`, background: chip.tint, marginLeft: 10, borderRadius: '0 3px 3px 0' }}>
+              {group.map(task => {
+                const isSelected = selectedTask?.id === task.id
+                const cl = task.checklist_items ?? []
+                const clDone = cl.filter(i => i.checked).length
                 return (
                   <div
                     key={task.id}
-                    className={clsx(
-                      'grid gap-3 items-center px-4 py-3 border-b border-zinc-800/50 cursor-pointer group transition-colors relative',
-                      isChecked           ? 'bg-indigo-950/20' :
-                      !task.rank && isOverdue ? 'bg-red-500/5 hover:bg-red-500/10' :
-                      !task.rank          ? 'hover:bg-zinc-800/40' : ''
-                    )}
-                    style={{
-                      ...gridStyle,
-                      ...(isChecked ? {} : task.rank ? {
-                        backgroundColor: hexToRgba(proj?.color || '#f59e0b', RANK_ROW_A[task.rank]),
-                        borderLeft: `3px solid ${hexToRgba(proj?.color || '#f59e0b', RANK_BORDER_A[task.rank])}`,
-                      } : isOverdue ? { borderLeft: '3px solid #f87171' } : {})
-                    }}
-                    onMouseEnter={e => { if (!isChecked && task.rank) e.currentTarget.style.backgroundColor = hexToRgba(proj?.color || '#f59e0b', RANK_HOVER_A[task.rank]) }}
-                    onMouseLeave={e => { if (!isChecked && task.rank) e.currentTarget.style.backgroundColor = hexToRgba(proj?.color || '#f59e0b', RANK_ROW_A[task.rank]) }}
-                    onClick={() => openTask(task)}
+                    onClick={() => onSelect(task)}
+                    className="flex items-center gap-2 px-2.5 py-[5px] cursor-pointer transition-colors"
+                    style={isSelected ? { background: 'rgba(249,115,22,.12)' } : {}}
+                    onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(255,255,255,.04)' }}
+                    onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = '' }}
                   >
-                    <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleSelect(task.id)}
-                        className="accent-indigo-500 cursor-pointer"
-                      />
-                    </div>
-                    <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
-                      <StatusPicker
-                        taskId={task.id}
-                        currentStatus={task.status}
-                        onStatusChange={(status) => statusMutation.mutate({ id: task.id, status })}
-                      />
-                    </div>
-
-                    <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
-                      <RankPicker
-                        currentRank={task.rank}
-                        projectColor={proj?.color}
-                        onRankChange={(rank) => rankMutation.mutate({ id: task.id, rank })}
-                        asBadge={!!task.rank}
-                        alwaysVisible
-                      />
-                    </div>
-
-                    <span className="flex flex-col min-w-0 gap-1">
-                      <span className={clsx('text-sm', isDone ? 'line-through text-zinc-600' : isCancelled ? 'line-through text-zinc-600' : 'text-zinc-200')}>
-                        {task.title}
-                      </span>
-                      {task.checklist_items?.length > 0 ? (() => {
-                        const cl = task.checklist_items
-                        const clDone = cl.filter(i => i.checked).length
-                        return (
-                          <div className="flex items-center gap-1.5">
-                            <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                              <div
-                                className={clsx('h-full rounded-full', isDone ? 'bg-emerald-500/70' : 'bg-indigo-500/70')}
-                                style={{ width: `${Math.round(clDone / cl.length * 100)}%` }}
-                              />
-                            </div>
-                            <span className="text-[10px] text-zinc-600 shrink-0">{clDone}/{cl.length}</span>
-                          </div>
-                        )
-                      })() : task.progress > 0 ? (
-                        <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
-                          <div
-                            className={clsx('h-full rounded-full', isDone ? 'bg-emerald-500' : 'bg-indigo-500')}
-                            style={{ width: `${task.progress}%` }}
-                          />
-                        </div>
-                      ) : null}
-                      {task.tags?.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {task.tags.map(tag => (
-                            <span
-                              key={tag.id}
-                              className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                              style={{ background: `${tag.color}22`, color: tag.color }}
-                            >
-                              <span className="w-1 h-1 rounded-full shrink-0" style={{ background: tag.color }} />
-                              {tag.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                    <div className={`w-[13px] h-[13px] rounded-full border shrink-0 transition-colors ${
+                      isSelected ? 'border-orange-400' : 'border-zinc-600'
+                    }`} />
+                    <span className={`text-[10px] font-mono shrink-0 ${
+                      isSelected ? 'text-orange-400/70' : 'text-zinc-600'
+                    }`}>#{task.id}</span>
+                    <span className={`text-[12.5px] truncate flex-1 leading-snug ${
+                      isSelected ? 'text-amber-100' : 'text-zinc-300'
+                    }`}>
+                      {task.title}
                     </span>
-
-                    <span>
-                      {proj
-                        ? <ProjectDot color={proj.color} name={proj.name} />
-                        : <span className="text-xs text-zinc-700">—</span>}
-                    </span>
-
-                    <PriorityBadge priority={task.priority} />
-                    <StatusBadge   status={task.status} statusNote={task.status_note} />
-
-                    <span className={clsx('text-xs', due?.overdue ? 'text-red-400 font-medium' : 'text-zinc-500')}>
-                      {due?.label ?? '—'}
-                    </span>
-
-                    <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-                      {!isDone && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            statusMutation.mutate({ id: task.id, status: 'done' })
-                          }}
-                          title="Mark as done"
-                          className="opacity-0 group-hover:opacity-100 p-1 text-zinc-600 hover:text-emerald-400 transition-all"
-                        >
-                          <Check size={14} />
-                        </button>
-                      )}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (confirm('Delete task?')) deleteMutation.mutate(task.id)
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-zinc-600 hover:text-red-400 transition-all"
-                      >
-                        <XCircle size={14} />
-                      </button>
-                    </div>
+                    {cl.length > 0 && (
+                      <span className="text-[10px] text-orange-400 shrink-0 font-medium">{clDone}/{cl.length}</span>
+                    )}
+                    {task.is_focus && <Star size={10} className="fill-amber-400 text-amber-400 shrink-0" />}
                   </div>
                 )
               })}
-
-              {/* Completed & Cancelled collapsible section */}
-              {!isCompletedFilter && completedTasks.length > 0 && (
-                <>
-                  <div
-                    className="flex items-center gap-2 px-4 py-2.5 cursor-pointer hover:bg-zinc-800/30 border-t border-zinc-800 select-none group/div transition-colors"
-                    onClick={() => setShowCompleted(o => !o)}
-                  >
-                    {showCompleted
-                      ? <ChevronDown  size={12} className="text-zinc-500" />
-                      : <ChevronRight size={12} className="text-zinc-500" />}
-                    <span className="text-xs font-medium text-zinc-500 group-hover/div:text-zinc-400 transition-colors">
-                      Completed &amp; Cancelled
-                    </span>
-                    <span className="text-[10px] text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded-full ml-0.5">
-                      {completedTasks.length}
-                    </span>
-                  </div>
-
-                  {showCompleted && completedTasks.map((task) => {
-                    const proj      = task.project_id ? projectMap[task.project_id] : null
-                    const due       = formatDue(task.due_date)
-                    const isChecked = selectedIds.has(task.id)
-
-                    return (
-                      <div
-                        key={task.id}
-                        className={clsx(
-                          'grid gap-3 items-center px-4 py-3 border-b border-zinc-800/50 cursor-pointer group transition-all relative opacity-50 hover:opacity-80',
-                          isChecked ? 'bg-indigo-950/20' : 'hover:bg-zinc-800/40'
-                        )}
-                        style={gridStyle}
-                        onClick={() => openTask(task)}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleSelect(task.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="accent-indigo-500 cursor-pointer"
-                        />
-                        <StatusPicker
-                          taskId={task.id}
-                          currentStatus={task.status}
-                          onStatusChange={(status) => statusMutation.mutate({ id: task.id, status })}
-                        />
-
-                        <span />
-
-                        <span className="flex flex-col min-w-0 gap-1">
-                          <span className="text-sm line-through text-zinc-600">
-                            {task.title}
-                          </span>
-                          {task.checklist_items?.length > 0 && (() => {
-                            const cl = task.checklist_items
-                            const clDone = cl.filter(i => i.checked).length
-                            return (
-                              <div className="flex items-center gap-1.5">
-                                <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                                  <div className="h-full bg-emerald-500/50 rounded-full" style={{ width: `${Math.round(clDone / cl.length * 100)}%` }} />
-                                </div>
-                                <span className="text-[10px] text-zinc-700 shrink-0">{clDone}/{cl.length}</span>
-                              </div>
-                            )
-                          })()}
-                          {task.tags?.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {task.tags.map(tag => (
-                                <span
-                                  key={tag.id}
-                                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                                  style={{ background: `${tag.color}22`, color: tag.color }}
-                                >
-                                  <span className="w-1 h-1 rounded-full shrink-0" style={{ background: tag.color }} />
-                                  {tag.name}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </span>
-
-                        <span>
-                          {proj
-                            ? <ProjectDot color={proj.color} name={proj.name} />
-                            : <span className="text-xs text-zinc-700">—</span>}
-                        </span>
-
-                        <PriorityBadge priority={task.priority} />
-                        <StatusBadge   status={task.status} statusNote={task.status_note} />
-
-                        <span className="text-xs text-zinc-600">
-                          {due?.label ?? '—'}
-                        </span>
-
-                        <div className="flex items-center gap-0.5">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (confirm('Delete task?')) deleteMutation.mutate(task.id)
-                            }}
-                            className="opacity-0 group-hover:opacity-100 p-1 text-zinc-600 hover:text-red-400 transition-all"
-                          >
-                            <XCircle size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </>
-              )}
             </div>
           </div>
-        )}
-      </div>
+        )
+      })}
 
-      <TaskDrawer
-        task={selectedTask}
-        onClose={() => setSelectedTask(null)}
-        onDeleted={() => setSelectedTask(null)}
-      />
+      {!isCompletedFilter && completedTasks.length > 0 && (
+        <div className="mt-2 border-t border-zinc-800/60 pt-1">
+          <div
+            className="flex items-center gap-1.5 px-2.5 py-1.5 cursor-pointer hover:bg-zinc-800/20 transition-colors select-none"
+            onClick={() => setShowCompleted(o => !o)}
+          >
+            {showCompleted ? <ChevronDown size={11} className="text-zinc-600" /> : <ChevronRight size={11} className="text-zinc-600" />}
+            <span className="text-[11px] text-zinc-600">Completed &amp; Cancelled</span>
+            <span className="text-[10px] text-zinc-700 bg-zinc-800/60 px-1.5 py-0.5 rounded-full">{completedTasks.length}</span>
+          </div>
+          {showCompleted && completedTasks.map(task => (
+            <div
+              key={task.id}
+              onClick={() => onSelect(task)}
+              className="flex items-center gap-2 px-2.5 py-[5px] cursor-pointer border-l-2 border-l-transparent hover:bg-zinc-800/20 opacity-40 hover:opacity-60 transition-all"
+            >
+              <div className="w-[13px] h-[13px] rounded-full border border-zinc-700 shrink-0" />
+              <span className="text-[10px] font-mono shrink-0 text-zinc-700">#{task.id}</span>
+              <span className="text-[12px] truncate flex-1 text-zinc-500 line-through">{task.title}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

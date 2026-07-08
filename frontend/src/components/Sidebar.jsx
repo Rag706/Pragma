@@ -10,10 +10,7 @@ export default function Sidebar() {
   const { data: stats }         = useQuery({ queryKey: ['stats'],    queryFn: getStats })
 
   const taskCountMap = Object.fromEntries(
-    (stats?.project_stats ?? []).map(p => [p.id, p.total - (p.done ?? 0)])
-  )
-  const topRankMap = Object.fromEntries(
-    (stats?.project_stats ?? []).map(p => [p.id, p.top_rank ?? null])
+    (stats?.project_stats ?? []).map(p => [p.id, p.total - (p.done ?? 0) - (p.cancelled ?? 0)])
   )
 
   const navigate       = useNavigate()
@@ -105,12 +102,6 @@ export default function Sidebar() {
               >
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
                 <span className="truncate flex-1">{p.name}</span>
-                {topRankMap[p.id] != null && (
-                  <span className="text-[10px] rounded-full px-1.5 py-0.5 leading-none shrink-0 font-black"
-                    style={{ background: p.color + '2e', color: p.color, border: `1px solid ${p.color}55` }}>
-                    #{topRankMap[p.id]}
-                  </span>
-                )}
                 {taskCountMap[p.id] > 0 && (
                   <span className="text-[10px] bg-zinc-700 text-zinc-400 rounded-full px-1.5 py-0.5 leading-none shrink-0">
                     {taskCountMap[p.id]}
@@ -139,41 +130,6 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* Status shortcuts — expanded only, only show statuses with tasks */}
-        {!collapsed && stats && (() => {
-          const k = stats.kpis
-          const shortcuts = [
-            { status: 'blocked',     label: 'Blocked',     count: k.blocked,     color: '#fb7185' },
-            { status: 'review',      label: 'In Review',   count: k.review,      color: '#a78bfa' },
-            { status: 'testing',     label: 'Testing',     count: k.testing,     color: '#22d3ee' },
-            { status: 'in_progress', label: 'In Progress', count: k.in_progress, color: '#818cf8' },
-          ].filter(s => s.count > 0)
-
-          if (!shortcuts.length) return null
-          const activeStatus = location.pathname === '/tasks' ? searchParams.get('status') : null
-
-          return (
-            <div className="pt-4">
-              <p className="px-3 pb-1.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-                Focus
-              </p>
-              {shortcuts.map(s => (
-                <Link
-                  key={s.status}
-                  to={`/tasks?status=${s.status}`}
-                  className={`${navBase} ${activeStatus === s.status ? navActive : navIdle}`}
-                >
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                  <span className="truncate flex-1">{s.label}</span>
-                  <span className="text-[10px] rounded-full px-1.5 py-0.5 leading-none shrink-0 font-semibold"
-                    style={{ backgroundColor: `${s.color}20`, color: s.color }}>
-                    {s.count}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )
-        })()}
       </nav>
 
       {/* Footer: settings */}

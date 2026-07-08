@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, FolderKanban, RefreshCw, X, ListTodo, Link2, FileText, BookOpen, ExternalLink, Tag } from 'lucide-react'
+import { Plus, Pencil, Trash2, FolderKanban, RefreshCw, X, ListTodo, Link2, FileText, BookOpen, ExternalLink, Tag, StickyNote } from 'lucide-react'
 import { getProjects, createProject, updateProject, deleteProject } from '../api/projects'
 import { getStats } from '../api/stats'
 import { getProjectReferences, createReference, updateReference, deleteReference } from '../api/references'
 import { getProjectTags, createTag, updateTag, deleteTag } from '../api/tags'
+import { getProjectNotes, createNote, updateNote, deleteNote } from '../api/notes'
 
 const COLORS = [
   '#6366F1', '#8B5CF6', '#EC4899', '#EF4444',
@@ -144,7 +145,7 @@ function ProjectDrawer({ open, project, onClose, onSubmit, loading }) {
 }
 
 // ── Project card ───────────────────────────────────────────────────
-function ProjectCard({ project, stats, onEdit, onDelete, onView, onAddTask, onReferences, onTags }) {
+function ProjectCard({ project, stats, onEdit, onDelete, onView, onAddTask, onReferences, onTags, onNotes }) {
   const pct     = stats?.pct     ?? 0
   const total   = stats?.total   ?? 0
   const done    = stats?.done    ?? 0
@@ -181,6 +182,10 @@ function ProjectCard({ project, stats, onEdit, onDelete, onView, onAddTask, onRe
           <button onClick={() => onReferences(project)} title="References"
             className="p-1.5 text-zinc-600 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-md transition-colors">
             <Link2 size={13} />
+          </button>
+          <button onClick={() => onNotes(project)} title="Notes"
+            className="p-1.5 text-zinc-600 hover:text-amber-400 hover:bg-amber-500/10 rounded-md transition-colors">
+            <StickyNote size={13} />
           </button>
           <button onClick={() => onEdit(project)}
             className="p-1.5 text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 rounded-md transition-colors">
@@ -411,6 +416,225 @@ function ReferencesDrawer({ project, onClose }) {
   )
 }
 
+// ── Notes Drawer ──────────────────────────────────────────────────
+const NOTE_COLORS = [
+  { name: 'Default', accent: '#a1a1aa' },
+  { name: 'Red',     accent: '#fca5a5' },
+  { name: 'Orange',  accent: '#fdba74' },
+  { name: 'Yellow',  accent: '#fde68a' },
+  { name: 'Green',   accent: '#86efac' },
+  { name: 'Blue',    accent: '#93c5fd' },
+  { name: 'Purple',  accent: '#d8b4fe' },
+  { name: 'Pink',    accent: '#f9a8d4' },
+]
+
+function NotesDrawer({ project, onClose }) {
+  const open = !!project
+  const qc   = useQueryClient()
+  const [form, setForm] = useState(null) // null=grid, {}=new, {id,...}=edit
+  const [editForm, setEditForm] = useState({ title: '', body: '', color: '#a1a1aa' })
+
+  const { data: notes = [] } = useQuery({
+    queryKey: ['notes', project?.id],
+    queryFn:  () => getProjectNotes(project.id),
+    enabled:  !!project?.id,
+  })
+
+  useEffect(() => {
+    if (!open) return
+    function handleKey(e) { if (e.key === 'Escape') { if (form) setForm(null); else onClose() } }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [open, form, onClose])
+
+  const createMut = useMutation({
+    mutationFn: (data) => createNote(project.id, data),
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['notes', project.id] }); setForm(null) },
+  })
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, ...data }) => updateNote(id, data),
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['notes', project.id] }); setForm(null) },
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: deleteNote,
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['notes', project.id] }),
+  })
+
+  function openNew() {
+    setEditForm({ title: '', body: '', color: '#a1a1aa' })
+    setForm({})
+  }
+
+  function openEdit(note) {
+    setEditForm({ title: note.title, body: note.body, color: note.color })
+    setForm(note)
+  }
+
+  function handleSave() {
+    if (!editForm.title.trim() && !editForm.body.trim()) return
+    if (form?.id) updateMut.mutate({ id: form.id, ...editForm })
+    else          createMut.mutate(editForm)
+  }
+
+  const isSaving = createMut.isPending || updateMut.isPending
+
+  const drawerCls = `fixed inset-y-0 right-0 z-50 w-[720px] bg-zinc-900 border-l border-zinc-800 shadow-2xl
+    flex flex-col transform transition-transform duration-200 ease-in-out ${open ? 'translate-x-0' : 'translate-x-full'}`
+
+  return (
+    <>
+      <div className={`fixed inset-0 z-40 bg-black/15 transition-opacity duration-200 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} />
+      <div className={drawerCls}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 shrink-0">
+          <div>
+            <p className="text-sm font-semibold text-zinc-200">
+              {form ? (form.id ? 'Edit Note' : 'New Note') : 'Notes'}
+            </p>
+            {project && !form && <p className="text-xs text-zinc-500 mt-0.5">{project.name} · {notes.length} note{notes.length !== 1 ? 's' : ''}</p>}
+          </div>
+          <div className="flex items-center gap-2">
+            {!form && (
+              <button
+                onClick={openNew}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition-colors"
+              >
+                <Plus size={12} /> Add Note
+              </button>
+            )}
+            <button onClick={() => form ? setForm(null) : onClose()}
+              className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors">
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+
+        {form ? (
+          /* ── New / Edit form ── */
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div>
+              <label className="text-xs text-zinc-500 block mb-1.5">Title</label>
+              <input
+                autoFocus
+                value={editForm.title}
+                onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="Note title…"
+                className={fieldCls}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-zinc-500 block mb-1.5">Body</label>
+              <textarea
+                value={editForm.body}
+                onChange={e => setEditForm(f => ({ ...f, body: e.target.value }))}
+                rows={6}
+                placeholder="Write your note…"
+                className={`${fieldCls} resize-none`}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-zinc-500 block mb-2">Color</label>
+              <div className="flex flex-wrap gap-2">
+                {NOTE_COLORS.map(c => (
+                  <button
+                    key={c.accent}
+                    type="button"
+                    onClick={() => setEditForm(f => ({ ...f, color: c.accent }))}
+                    title={c.name}
+                    className="w-7 h-7 rounded-full transition-transform hover:scale-110 border-2"
+                    style={{
+                      backgroundColor: c.accent,
+                      borderColor: editForm.color === c.accent ? '#f4f4f5' : 'transparent',
+                      transform: editForm.color === c.accent ? 'scale(1.15)' : undefined,
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setForm(null)} className="flex-1 py-2 text-sm text-zinc-400 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors">Cancel</button>
+              <button
+                onClick={handleSave}
+                disabled={(!editForm.title.trim() && !editForm.body.trim()) || isSaving}
+                className="flex-1 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 rounded-lg transition-colors"
+              >
+                {isSaving ? 'Saving…' : form?.id ? 'Save Changes' : 'Add Note'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* ── Card grid ── */
+          <div className="flex-1 overflow-y-auto p-5">
+            {notes.length === 0 ? (
+              /* Empty state — show one "Add note" card */
+              <div
+                onClick={openNew}
+                className="border-2 border-dashed border-zinc-700 hover:border-zinc-500 rounded-xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors group"
+              >
+                <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-zinc-700 flex items-center justify-center transition-colors">
+                  <Plus size={18} className="text-zinc-500 group-hover:text-zinc-300" />
+                </div>
+                <p className="text-sm text-zinc-500 group-hover:text-zinc-300 font-medium transition-colors">New note</p>
+                <p className="text-xs text-zinc-700">No notes yet for this project</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-4 items-start">
+                {notes.map(note => (
+                  <div
+                    key={note.id}
+                    className="bg-zinc-800/60 border border-zinc-700/50 rounded-xl p-4 flex flex-col gap-3 group/card hover:-translate-y-0.5 transition-all duration-150 hover:shadow-lg hover:border-zinc-600"
+                    style={{ borderTopColor: note.color, borderTopWidth: 4 }}
+                  >
+                    {note.title && (
+                      <p className="text-sm font-bold text-zinc-100 leading-snug pr-1">{note.title}</p>
+                    )}
+                    {note.body && (
+                      <p className="text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap flex-1">{note.body}</p>
+                    )}
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="flex items-center gap-1.5 text-[11px] text-zinc-600">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: note.color }} />
+                        {NOTE_COLORS.find(c => c.accent === note.color)?.name ?? 'Custom'}
+                      </span>
+                      <div className="flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => openEdit(note)}
+                          className="p-1.5 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700 rounded-md transition-colors"
+                        >
+                          <Pencil size={11} />
+                        </button>
+                        <button
+                          onClick={() => { if (confirm('Delete this note?')) deleteMut.mutate(note.id) }}
+                          className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add note card */}
+                <div
+                  onClick={openNew}
+                  className="border-2 border-dashed border-zinc-700 hover:border-zinc-500 rounded-xl p-4 flex flex-col items-center justify-center gap-2 min-h-[100px] cursor-pointer transition-all hover:-translate-y-0.5 group/add"
+                >
+                  <div className="w-8 h-8 rounded-full bg-zinc-800 group-hover/add:bg-zinc-700 flex items-center justify-center transition-colors">
+                    <Plus size={14} className="text-zinc-500 group-hover/add:text-zinc-300" />
+                  </div>
+                  <span className="text-xs text-zinc-500 group-hover/add:text-zinc-300 font-medium transition-colors">New note</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
 // ── Tags Drawer ────────────────────────────────────────────────────
 const TAG_PALETTE = [
   '#6366f1','#8b5cf6','#ec4899','#f87171','#fb923c',
@@ -535,9 +759,10 @@ export default function Projects() {
   const [drawerProject, setDrawerProject] = useState(null)
   const drawerOpen = drawerProject !== null
 
-  // references / tags drawer state
-  const [refsProject, setRefsProject] = useState(null)
-  const [tagsProject, setTagsProject] = useState(null)
+  // references / tags / notes drawer state
+  const [refsProject,  setRefsProject]  = useState(null)
+  const [tagsProject,  setTagsProject]  = useState(null)
+  const [notesProject, setNotesProject] = useState(null)
 
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
   const { data: stats }         = useQuery({ queryKey: ['stats'],    queryFn: getStats })
@@ -619,6 +844,7 @@ export default function Projects() {
               onAddTask={id => navigate(`/tasks?project=${id}&new=1`)}
               onReferences={proj => setRefsProject(proj)}
               onTags={proj => setTagsProject(proj)}
+              onNotes={proj => setNotesProject(proj)}
             />
           ))}
         </div>
@@ -641,6 +867,11 @@ export default function Projects() {
       <TagsDrawer
         project={tagsProject}
         onClose={() => setTagsProject(null)}
+      />
+
+      <NotesDrawer
+        project={notesProject}
+        onClose={() => setNotesProject(null)}
       />
     </div>
   )

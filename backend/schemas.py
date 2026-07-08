@@ -64,6 +64,7 @@ class TaskBase(BaseModel):
     start_date: Optional[str] = None
     progress: int = 0
     notes: Optional[str] = ""
+    details: Optional[str] = ""
     is_focus: bool = False
     rank: Optional[int] = None
 
@@ -80,6 +81,7 @@ class TaskUpdate(BaseModel):
     start_date: Optional[str] = None
     progress: Optional[int] = None
     notes: Optional[str] = None
+    details: Optional[str] = None
     is_focus: Optional[bool] = None
     rank: Optional[int] = None
 
@@ -96,6 +98,8 @@ class Task(TaskBase):
     checklist_items: list['ChecklistItemOut'] = []
     class Config:
         from_attributes = True
+
+
 
 
 # ── Checklist ─────────────────────────────────────────────────────
@@ -185,6 +189,33 @@ class TimeEntryRich(TimeEntry):
 
 # ── Project References ────────────────────────────────────────────
 
+# ── Project Notes ─────────────────────────────────────────────────
+
+class NoteCreate(BaseModel):
+    title: str = ""
+    body: str = ""
+    color: str = "#a1a1aa"
+
+class NoteUpdate(BaseModel):
+    title: Optional[str] = None
+    body: Optional[str] = None
+    color: Optional[str] = None
+
+class NoteOut(BaseModel):
+    id: int
+    project_id: int
+    title: str
+    body: str
+    color: str
+    position: int
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+class NoteReorder(BaseModel):
+    ids: list[int]
+
+
 class ReferenceCreate(BaseModel):
     title: str
     url: Optional[str] = ""
@@ -204,6 +235,22 @@ class ReferenceOut(BaseModel):
     url: Optional[str]
     notes: Optional[str]
     ref_type: str
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+
+# ── Project Logs ──────────────────────────────────────────────────
+
+class ProjectLogCreate(BaseModel):
+    content: str
+    author: str = "user"
+
+class ProjectLogOut(BaseModel):
+    id: int
+    project_id: int
+    content: str
+    author: str
     created_at: datetime
     class Config:
         from_attributes = True

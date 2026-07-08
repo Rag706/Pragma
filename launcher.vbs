@@ -21,7 +21,7 @@ WshShell.Run "explorer """ & ScriptDir & "\loading.html"""
 PythonCmd = "py -3"
 result = WshShell.Run("cmd /c where py", 0, True)
 If result <> 0 Then
-    PythonCmd = """" & LocalAppData & "\Programs\Python\Python313\python.exe"""
+    PythonCmd = """" & LocalAppData & "\Programs\Python\Python314\python.exe"""
 End If
 
 ' --- Check / install Python packages ---

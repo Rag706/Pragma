@@ -63,7 +63,8 @@ def get_stats(db: Session = Depends(get_db)):
     proj_rows = db.query(
         models.Task.project_id,
         func.count(models.Task.id).label("total"),
-        func.sum(case((models.Task.status == "done", 1), else_=0)).label("done"),
+        func.sum(case((models.Task.status == "done",      1), else_=0)).label("done"),
+        func.sum(case((models.Task.status == "cancelled", 1), else_=0)).label("cancelled"),
         func.sum(case(
             (and_(
                 models.Task.due_date < today,
@@ -79,20 +80,22 @@ def get_stats(db: Session = Depends(get_db)):
     project_stats = []
     for p in projects:
         r = stats_map.get(p.id)
-        p_total    = r.total    if r else 0
-        p_done     = r.done     if r else 0
-        p_overdue  = r.overdue  if r else 0
-        p_top_rank = r.top_rank if r else None
+        p_total     = r.total     if r else 0
+        p_done      = r.done      if r else 0
+        p_cancelled = r.cancelled if r else 0
+        p_overdue   = r.overdue   if r else 0
+        p_top_rank  = r.top_rank  if r else None
         project_stats.append({
-            "id":       p.id,
-            "name":     p.name,
-            "color":    p.color,
-            "type":     p.type,
-            "total":    p_total,
-            "done":     p_done,
-            "overdue":  p_overdue,
-            "top_rank": p_top_rank,
-            "pct":      round((p_done / p_total * 100) if p_total > 0 else 0),
+            "id":        p.id,
+            "name":      p.name,
+            "color":     p.color,
+            "type":      p.type,
+            "total":     p_total,
+            "done":      p_done,
+            "cancelled": p_cancelled,
+            "overdue":   p_overdue,
+            "top_rank":  p_top_rank,
+            "pct":       round((p_done / p_total * 100) if p_total > 0 else 0),
         })
 
     # ── Query 4: upcoming tasks with JOIN (not N project lookups) ────

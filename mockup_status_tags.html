@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Status Tag Designs</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #09090b; color: #e4e4e7;
+    display: flex; gap: 1px; height: 100vh; overflow: hidden;
+  }
+
+  /* ── Shared column ── */
+  .col {
+    flex: 1; display: flex; flex-direction: column;
+    background: #0f0f12; border-right: 1px solid #1f1f23; overflow-hidden;
+  }
+  .col-title {
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid #1f1f23;
+    font-size: 11px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: #52525b;
+    background: #111114;
+  }
+  .col-label {
+    font-size: 10px; color: #71717a; font-weight: 500;
+    padding: 6px 14px 0; letter-spacing: .02em;
+  }
+  .task-scroll { flex: 1; overflow-y: auto; padding-bottom: 16px; }
+
+  /* ── Shared task row ── */
+  .task-row {
+    display: flex; align-items: center; gap: 7px;
+    padding: 5px 10px; cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: background .1s;
+  }
+  .task-row:hover { background: #18181b; }
+  .task-row.selected { background: #1a1a1f; border-left-color: #f97316; }
+  .tr-circle {
+    width: 13px; height: 13px; border-radius: 50%;
+    border: 1.5px solid #3f3f46; flex-shrink: 0; transition: border-color .1s;
+  }
+  .task-row.selected .tr-circle { border-color: #f97316; }
+  .tr-title {
+    font-size: 12.5px; color: #c4c4c7;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
+  }
+  .task-row.selected .tr-title { color: #fde68a; }
+  .tr-cl { font-size: 10px; color: #f97316; flex-shrink: 0; }
+
+
+  /* ══════════════════════════════════════════════════════
+     DESIGN A — Pill chip (current, refined)
+     Small colored pill, slightly larger padding, bolder text
+  ══════════════════════════════════════════════════════ */
+  .a-group { margin-bottom: 2px; }
+  .a-header { padding: 10px 10px 4px; }
+  .a-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; padding: 3px 9px;
+    border-radius: 20px; white-space: nowrap;
+  }
+  .a-chip-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+  .a-count { font-size: 9px; opacity: .7; margin-left: 2px; }
+
+
+  /* ══════════════════════════════════════════════════════
+     DESIGN B — Left border section header
+     No background on header, just a colored vertical bar + text
+  ══════════════════════════════════════════════════════ */
+  .b-group { margin-bottom: 4px; }
+  .b-header {
+    display: flex; align-items: center; gap: 0;
+    margin: 8px 0 2px; border-left: 3px solid;
+  }
+  .b-header-inner {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+  }
+  .b-label {
+    font-size: 10px; font-weight: 700; letter-spacing: .07em;
+    text-transform: uppercase;
+  }
+  .b-badge {
+    font-size: 9px; font-weight: 600;
+    background: #1f1f23; color: #52525b;
+    padding: 1px 5px; border-radius: 8px;
+  }
+  .b-task-row {
+    display: flex; align-items: center; gap: 7px;
+    padding: 5px 10px 5px 14px; cursor: pointer;
+    border-left: 2px solid transparent; transition: background .1s;
+  }
+  .b-task-row:hover { background: #18181b; }
+  .b-task-row.selected { background: #1a1a1f; border-left-color: #f97316; }
+  .b-task-row .tr-circle { border-color: #3f3f46; }
+  .b-task-row.selected .tr-circle { border-color: #f97316; }
+
+
+  /* ══════════════════════════════════════════════════════
+     DESIGN C — Inline status dot on every row, no group header
+     Each task shows its own colored dot; rows are sorted by status
+  ══════════════════════════════════════════════════════ */
+  .c-task-row {
+    display: flex; align-items: center; gap: 7px;
+    padding: 5px 10px; cursor: pointer;
+    border-left: 2px solid transparent; transition: background .1s;
+  }
+  .c-task-row:hover { background: #18181b; }
+  .c-task-row.selected { background: #1a1a1f; border-left-color: #f97316; }
+  .c-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .c-status-label {
+    font-size: 9px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .06em; flex-shrink: 0;
+  }
+  .c-divider {
+    height: 1px; background: #1f1f23;
+    margin: 4px 10px; margin-top: 6px;
+  }
+
+
+  /* ══════════════════════════════════════════════════════
+     DESIGN D — Tinted group background + bold header
+     Entire group has a very subtle color wash behind it
+  ══════════════════════════════════════════════════════ */
+  .d-group { margin-bottom: 4px; }
+  .d-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px 4px;
+  }
+  .d-line { flex: 1; height: 1px; }
+  .d-label {
+    font-size: 10px; font-weight: 700; letter-spacing: .07em;
+    text-transform: uppercase; flex-shrink: 0;
+  }
+  .d-count-badge {
+    font-size: 9px; font-weight: 600;
+    padding: 1px 5px; border-radius: 8px; flex-shrink: 0;
+  }
+  .d-body { border-left: 2px solid; margin-left: 10px; border-radius: 0 4px 4px 0; }
+  .d-task-row {
+    display: flex; align-items: center; gap: 7px;
+    padding: 5px 10px; cursor: pointer; transition: background .1s;
+  }
+  .d-task-row:hover { filter: brightness(1.15); }
+  .d-task-row.selected { outline: 1px solid #f97316; }
+
+</style>
+</head>
+<body>
+
+<!-- ═══ DESIGN A — Pill chip (current, refined) ═══ -->
+<div class="col">
+  <div class="col-title">A — Pill Chip (current)</div>
+  <div class="col-label">Bolder text, dot accent inside chip</div>
+  <div class="task-scroll" style="padding-top:4px">
+
+    <div class="a-group">
+      <div class="a-header">
+        <span class="a-chip" style="background:#1e3a5f;color:#60a5fa">
+          <span class="a-chip-dot" style="background:#60a5fa"></span>In Progress<span class="a-count">3</span>
+        </span>
+      </div>
+      <div class="task-row selected">
+        <div class="tr-circle"></div>
+        <span class="tr-title">スレッドからの自動起票の取…</span>
+      </div>
+      <div class="task-row">
+        <div class="tr-circle"></div>
+        <span class="tr-title">テスト管理自動化（Team…</span>
+        <span class="tr-cl">5/7</span>
+      </div>
+      <div class="task-row">
+        <div class="tr-circle"></div>
+        <span class="tr-title">AI Knowledge v2 画面</span>
+      </div>
+    </div>
+
+    <div class="a-group">
+      <div class="a-header">
+        <span class="a-chip" style="background:#3d2c00;color:#facc15">
+          <span class="a-chip-dot" style="background:#facc15"></span>Up Next<span class="a-count">1</span>
+        </span>
+      </div>
+      <div class="task-row">
+        <div class="tr-circle"></div>
+        <span class="tr-title">結合テストのセットアップ</span>
+      </div>
+    </div>
+
+    <div class="a-group">
+      <div class="a-header">
+        <span class="a-chip" style="background:#27272a;color:#a1a1aa">
+          <span class="a-chip-dot" style="background:#71717a"></span>To Do<span class="a-count">3</span>
+        </span>
+      </div>
+      <div class="task-row">
+        <div class="tr-circle"></div>
+        <span class="tr-title">test</span>
+      </div>
+      <div class="task-row">
+        <div class="tr-circle"></div>
+        <span class="tr-title">外部結合テストのシナリオ作成</span>
+      </div>
+      <div class="task-row">
+        <div class="tr-circle"></div>
+        <span class="tr-title">外部結合の事前チェックリスト</span>
+      </div>
+    </div>
+
+    <div class="a-group">
+      <div class="a-header">
+        <span class="a-chip" style="background:#450a0a;color:#f87171">
+          <span class="a-chip-dot" style="background:#f87171"></span>Blocked<span class="a-count">1</span>
+        </span>
+      </div>
+      <div class="task-row">
+        <div class="tr-circle"></div>
+        <span class="tr-title">APIレスポンスの検証</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ DESIGN B — Left border section header ═══ -->
+<div class="col">
+  <div class="col-title">B — Left Border Header</div>
+  <div class="col-label">Colored left bar, no chip background</div>
+  <div class="task-scroll" style="padding-top:6px">
+
+    <div class="b-group">
+      <div class="b-header" style="border-color:#818cf8">
+        <div class="b-header-inner">
+          <span class="b-label" style="color:#818cf8">In Progress</span>
+          <span class="b-badge">3</span>
+        </div>
+      </div>
+      <div class="b-task-row selected">
+        <div class="tr-circle"></div>
+        <span class="tr-title">スレッドからの自動起票の取…</span>
+      </div>
+      <div class="b-task-row">
+        <div class="tr-circle"></div>
+        <span class="tr-title">テスト管理自動化（Team…</span>
+        <span class="tr-cl">5/7</span>
+      </div>
+      <div class="b-task-row">
+        <div class="tr-circle"></div>
+        <span class="tr-title">AI Knowledge v2 画面</span>
+      </div>
+    </div>
+
+    <div class="b-group">
+      <div class="b-header" style="border-color:#fbbf24">
+        <div class="b-header-inner">
+          <span class="b-label" style="color:#fbbf24">Up Next</span>
+          <span class="b-badge">1</span>
+        </div>
+      </div>
+      <div class="b-task-row">
+        <div class="tr-circle"></div>
+        <span class="tr-title">結合テストのセットアップ</span>
+      </div>
+    </div>
+
+    <div class="b-group">
+      <div class="b-header" style="border-color:#71717a">
+        <div class="b-header-inner">
+          <span class="b-label" style="color:#71717a">To Do</span>
+          <span class="b-badge">3</span>
+        </div>
+      </div>
+      <div class="b-task-row">
+        <div class="tr-circle"></div>
+        <span class="tr-title">test</span>
+      </div>
+      <div class="b-task-row">
+        <div class="tr-circle"></div>
+        <span class="tr-title">外部結合テストのシナリオ作成</span>
+      </div>
+      <div class="b-task-row">
+        <div class="tr-circle"></div>
+        <span class="tr-title">外部結合の事前チェックリスト</span>
+      </div>
+    </div>
+
+    <div class="b-group">
+      <div class="b-header" style="border-color:#f87171">
+        <div class="b-header-inner">
+          <span class="b-label" style="color:#f87171">Blocked</span>
+          <span class="b-badge">1</span>
+        </div>
+      </div>
+      <div class="b-task-row">
+        <div class="tr-circle"></div>
+        <span class="tr-title">APIレスポンスの検証</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ DESIGN C — No group headers, inline status per row ═══ -->
+<div class="col">
+  <div class="col-title">C — Inline Status Per Row</div>
+  <div class="col-label">No section header; each row shows its own status</div>
+  <div class="task-scroll" style="padding-top:8px">
+
+    <!-- in_progress group -->
+    <div class="c-task-row selected">
+      <div class="c-dot" style="background:#818cf8"></div>
+      <span class="tr-title">スレッドからの自動起票の取…</span>
+    </div>
+    <div class="c-task-row">
+      <div class="c-dot" style="background:#818cf8"></div>
+      <span class="tr-title">テスト管理自動化（Team…</span>
+      <span class="tr-cl">5/7</span>
+    </div>
+    <div class="c-task-row">
+      <div class="c-dot" style="background:#818cf8"></div>
+      <span class="tr-title">AI Knowledge v2 画面</span>
+    </div>
+
+    <div class="c-divider"></div>
+
+    <!-- up_next group -->
+    <div class="c-task-row">
+      <div class="c-dot" style="background:#fbbf24"></div>
+      <span class="tr-title">結合テストのセットアップ</span>
+    </div>
+
+    <div class="c-divider"></div>
+
+    <!-- todo group -->
+    <div class="c-task-row">
+      <div class="c-dot" style="background:#71717a"></div>
+      <span class="tr-title">test</span>
+    </div>
+    <div class="c-task-row">
+      <div class="c-dot" style="background:#71717a"></div>
+      <span class="tr-title">外部結合テストのシナリオ作成</span>
+    </div>
+    <div class="c-task-row">
+      <div class="c-dot" style="background:#71717a"></div>
+      <span class="tr-title">外部結合の事前チェックリスト</span>
+    </div>
+
+    <div class="c-divider"></div>
+
+    <!-- blocked group -->
+    <div class="c-task-row">
+      <div class="c-dot" style="background:#f87171"></div>
+      <span class="tr-title">APIレスポンスの検証</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ DESIGN D — Tinted group background ═══ -->
+<div class="col" style="border-right:none">
+  <div class="col-title">D — Tinted Group Background</div>
+  <div class="col-label">Subtle color wash behind each status group</div>
+  <div class="task-scroll" style="padding-top:6px">
+
+    <!-- in_progress -->
+    <div class="d-group">
+      <div class="d-header">
+        <span class="d-label" style="color:#818cf8">In Progress</span>
+        <div class="d-line" style="background:rgba(129,140,248,.15)"></div>
+        <span class="d-count-badge" style="background:rgba(129,140,248,.15);color:#818cf8">3</span>
+      </div>
+      <div class="d-body" style="border-color:#818cf8;background:rgba(129,140,248,.04)">
+        <div class="d-task-row selected" style="background:rgba(249,115,22,.06)">
+          <div class="tr-circle" style="border-color:#f97316"></div>
+          <span class="tr-title" style="color:#fde68a">スレッドからの自動起票の取…</span>
+        </div>
+        <div class="d-task-row">
+          <div class="tr-circle"></div>
+          <span class="tr-title">テスト管理自動化（Team…</span>
+          <span class="tr-cl" style="margin-left:auto">5/7</span>
+        </div>
+        <div class="d-task-row">
+          <div class="tr-circle"></div>
+          <span class="tr-title">AI Knowledge v2 画面</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- up_next -->
+    <div class="d-group">
+      <div class="d-header">
+        <span class="d-label" style="color:#fbbf24">Up Next</span>
+        <div class="d-line" style="background:rgba(251,191,36,.15)"></div>
+        <span class="d-count-badge" style="background:rgba(251,191,36,.15);color:#fbbf24">1</span>
+      </div>
+      <div class="d-body" style="border-color:#fbbf24;background:rgba(251,191,36,.04)">
+        <div class="d-task-row">
+          <div class="tr-circle"></div>
+          <span class="tr-title">結合テストのセットアップ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- todo -->
+    <div class="d-group">
+      <div class="d-header">
+        <span class="d-label" style="color:#71717a">To Do</span>
+        <div class="d-line" style="background:rgba(113,113,122,.15)"></div>
+        <span class="d-count-badge" style="background:rgba(113,113,122,.15);color:#71717a">3</span>
+      </div>
+      <div class="d-body" style="border-color:#71717a;background:rgba(113,113,122,.03)">
+        <div class="d-task-row">
+          <div class="tr-circle"></div>
+          <span class="tr-title">test</span>
+        </div>
+        <div class="d-task-row">
+          <div class="tr-circle"></div>
+          <span class="tr-title">外部結合テストのシナリオ作成</span>
+        </div>
+        <div class="d-task-row">
+          <div class="tr-circle"></div>
+          <span class="tr-title">外部結合の事前チェックリスト</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- blocked -->
+    <div class="d-group">
+      <div class="d-header">
+        <span class="d-label" style="color:#f87171">Blocked</span>
+        <div class="d-line" style="background:rgba(248,113,113,.15)"></div>
+        <span class="d-count-badge" style="background:rgba(248,113,113,.15);color:#f87171">1</span>
+      </div>
+      <div class="d-body" style="border-color:#f87171;background:rgba(248,113,113,.04)">
+        <div class="d-task-row">
+          <div class="tr-circle"></div>
+          <span class="tr-title">APIレスポンスの検証</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

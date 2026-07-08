@@ -13,9 +13,9 @@ where python 2>&1
 python --version 2>&1
 
 echo.
-echo [3] Python 3.13 at known path...
-if exist "%LocalAppData%\Programs\Python\Python313\python.exe" (
-    echo FOUND: %LocalAppData%\Programs\Python\Python313\python.exe
+echo [3] Python 3.14 at known path...
+if exist "%LocalAppData%\Programs\Python\Python314\python.exe" (
+    echo FOUND: %LocalAppData%\Programs\Python\Python314\python.exe
 ) else (
     echo NOT FOUND at that path
 )

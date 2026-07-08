@@ -20,6 +20,70 @@ html, body, #root {
 /* Smooth transitions for interactive elements */
 button, a { transition: all 0.15s ease; }
 
+/* ── TipTap rich text editor ─────────────────────────────────── */
+.tiptap-editor { flex: 1; display: flex; flex-direction: column; }
+
+.ProseMirror {
+  flex: 1;
+  min-height: 60vh;
+  outline: none;
+  color: #a1a1aa; /* zinc-400 */
+  font-size: 13px;
+  line-height: 1.75;
+  caret-color: #6366f1;
+}
+
+.ProseMirror p { margin: 0 0 0.5em; }
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #3f3f46;
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+.ProseMirror h1 { font-size: 1.6em; font-weight: 700; color: #f4f4f5; margin: 0.8em 0 0.3em; }
+.ProseMirror h2 { font-size: 1.3em; font-weight: 600; color: #e4e4e7; margin: 0.7em 0 0.25em; }
+.ProseMirror h3 { font-size: 1.1em; font-weight: 600; color: #d4d4d8; margin: 0.6em 0 0.2em; }
+
+.ProseMirror ul { list-style-type: disc;    padding-left: 1.4em; margin: 0.4em 0; }
+.ProseMirror ol { list-style-type: decimal; padding-left: 1.4em; margin: 0.4em 0; }
+.ProseMirror li { margin: 0.15em 0; }
+.ProseMirror li p { margin: 0; }
+
+.ProseMirror strong { font-weight: 700; color: #d4d4d8; }
+.ProseMirror em     { font-style: italic; }
+.ProseMirror s      { text-decoration: line-through; opacity: 0.6; }
+.ProseMirror u      { text-decoration: underline; text-underline-offset: 2px; }
+
+.ProseMirror mark   { border-radius: 2px; padding: 0 2px; color: #18181b; }
+
+.ProseMirror code {
+  background: #27272a;
+  border-radius: 3px;
+  padding: 0.1em 0.35em;
+  font-family: monospace;
+  font-size: 0.88em;
+  color: #a5b4fc;
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid #3f3f46;
+  padding-left: 1em;
+  color: #71717a;
+  margin: 0.6em 0;
+}
+
+.ProseMirror hr {
+  border: none;
+  border-top: 1px solid #3f3f46;
+  margin: 1.2em 0;
+}
+
+/* ── Notes field rich editor — compact height override ───────── */
+.notes-rich-editor .ProseMirror { min-height: 80px; color: #e4e4e7; }
+.notes-rich-editor .tiptap-editor { flex: unset; }
+
 /* ── Bright theme — bumps all zinc grays toward white ────────── */
 html.theme-bright .text-zinc-700 { color: rgb(161 161 170); }   /* → zinc-400 */
 html.theme-bright .text-zinc-600 { color: rgb(212 212 216); }   /* → zinc-300 */

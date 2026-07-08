@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>TaskFlow — Mockup B</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #09090b; color: #e4e4e7; height: 100vh; display: flex; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  .sidebar { width: 48px; min-width: 48px; background: #18181b; border-right: 1px solid #27272a; display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 4px; }
+  .sidebar-logo { font-size: 18px; color: #f97316; margin-bottom: 8px; }
+  .sidebar-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; cursor: pointer; color: #71717a; }
+  .sidebar-icon:hover { background: #27272a; color: #e4e4e7; }
+  .sidebar-icon.active { background: #27272a; color: #f97316; }
+  .sidebar-divider { width: 24px; height: 1px; background: #27272a; margin: 4px 0; }
+
+  /* ── Project panel ── */
+  .project-panel { width: 168px; background: #111113; border-right: 1px solid #27272a; display: flex; flex-direction: column; }
+  .pp-header { padding: 14px 12px 6px; font-size: 10px; color: #52525b; text-transform: uppercase; letter-spacing: .08em; }
+  .pp-item { padding: 7px 10px; cursor: pointer; display: flex; align-items: center; gap: 7px; border-radius: 6px; margin: 1px 5px; font-size: 13px; color: #a1a1aa; }
+  .pp-item:hover { background: #1c1c20; color: #d4d4d8; }
+  .pp-item.active { background: #1c1c20; color: #f4f4f5; }
+  .pdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .pbadge { margin-left: auto; font-size: 10px; color: #52525b; background: #1f1f23; padding: 1px 5px; border-radius: 8px; }
+
+  /* ── Main area ── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Project-level tab bar */
+  .project-tabs { display: flex; align-items: center; border-bottom: 1px solid #27272a; padding: 0 16px; background: #0f0f12; gap: 2px; flex-shrink: 0; }
+  .proj-tab { padding: 10px 14px; font-size: 13px; color: #71717a; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; user-select: none; }
+  .proj-tab:hover { color: #a1a1aa; }
+  .proj-tab.active { color: #f97316; border-bottom-color: #f97316; }
+  /* Task-level tabs inside detail panel */
+  .td-tabs { display: flex; border-bottom: 2px solid #27272a; padding: 0 18px; background: #111114; flex-shrink: 0; gap: 2px; }
+  .td-tab { padding: 8px 12px; font-size: 12px; color: #71717a; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; user-select: none; }
+  .td-tab:hover { color: #d4d4d8; }
+  .td-tab.active { color: #f97316; border-bottom-color: #f97316; }
+  .td-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .td-activity { flex: 1; overflow-y: auto; padding: 16px 24px; }
+
+  /* ── TASKS VIEW: split panel ── */
+  .tasks-view { flex: 1; display: flex; overflow: hidden; }
+  .notes-view { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+
+  /* Task list: ultra-compact */
+  .task-list-panel { width: 272px; min-width: 200px; background: #0f0f12; border-right: 1px solid #27272a; display: flex; flex-direction: column; overflow: hidden; }
+  .tl-header { padding: 10px 10px 6px; border-bottom: 1px solid #1f1f23; display: flex; align-items: center; justify-content: space-between; }
+  .tl-title { font-size: 13px; font-weight: 600; color: #d4d4d8; }
+  .tl-count { font-size: 11px; color: #52525b; }
+  .tl-add { font-size: 18px; color: #52525b; cursor: pointer; line-height: 1; }
+  .tl-add:hover { color: #f97316; }
+
+  .task-scroll { flex: 1; overflow-y: auto; }
+  .tg-header { padding: 10px 10px 3px; display: flex; align-items: center; gap: 6px; }
+  .tg-chip { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; letter-spacing: .04em; text-transform: uppercase; }
+  .tg-chip.todo    { background: #27272a; color: #a1a1aa; }
+  .tg-chip.inprog  { background: #1e3a5f; color: #60a5fa; }
+  .tg-chip.upnext  { background: #3d2c00; color: #facc15; }
+  .tg-chip.done    { background: #14301a; color: #4ade80; }
+  .tg-chip.blocked { background: #450a0a; color: #f87171; }
+  .tg-dot { display: none; }
+
+  .task-row { padding: 6px 10px; cursor: pointer; border-left: 2px solid transparent; display: flex; align-items: center; gap: 6px; }
+  .task-row:hover { background: #18181b; }
+  .task-row.selected { background: #1a1a1f; border-left-color: #f97316; }
+  .tr-check { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #3f3f46; flex-shrink: 0; }
+  .tr-title { font-size: 12.5px; color: #c4c4c7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .task-row.selected .tr-title { color: #fde68a; }
+  .tr-cl { font-size: 10px; color: #f97316; flex-shrink: 0; }
+  .add-row { padding: 7px 10px; cursor: pointer; display: flex; align-items: center; gap: 5px; color: #3f3f46; font-size: 12.5px; }
+  .add-row:hover { color: #71717a; }
+
+  /* Resize handle */
+  .resize-handle { width: 4px; cursor: col-resize; background: transparent; flex-shrink: 0; transition: background .15s; }
+  .resize-handle:hover, .resize-handle.dragging { background: #f97316; }
+
+  /* ── Task Detail ── */
+  .task-detail-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #0b0b0e; }
+  .td-topbar { padding: 9px 18px; border-bottom: 1px solid #1f1f23; display: flex; align-items: center; gap: 10px; }
+  .td-breadcrumb { font-size: 12px; color: #52525b; }
+  .td-breadcrumb span { color: #71717a; }
+  .td-toolbar { margin-left: auto; display: flex; gap: 4px; }
+  .tool-btn { padding: 5px 9px; background: #18181b; border: 1px solid #27272a; border-radius: 6px; color: #71717a; font-size: 12px; cursor: pointer; }
+  .tool-btn:hover { color: #d4d4d8; border-color: #3f3f46; }
+  .tool-btn.danger:hover { color: #f87171; background: #1c0f0f; border-color: #7f1d1d; }
+
+  .td-fields { display: flex; border-bottom: 1px solid #1f1f23; overflow-x: auto; flex-shrink: 0; }
+  .td-field { padding: 7px 14px; border-right: 1px solid #1f1f23; flex-shrink: 0; cursor: pointer; }
+  .td-field:hover { background: rgba(139, 92, 246, 0.12); }
+  .td-field-label { font-size: 10px; color: #a1a1aa; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; }
+  .td-field-value { font-size: 12.5px; color: #f4f4f5; font-weight: 500; }
+  .td-field-value.blue { color: #60a5fa; }
+  .td-field-value.orange { color: #fb923c; }
+  .td-field-value.muted { color: #3f3f46; }
+  .td-field-value.pri-low    { color: #facc15; }
+  .td-field-value.pri-medium { color: #fb923c; }
+  .td-field-value.pri-high   { color: #f87171; }
+
+  .td-body { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 18px; }
+  .td-title-input { font-size: 20px; font-weight: 700; color: #f4f4f5; background: transparent; border: none; outline: none; width: 100%; font-family: inherit; line-height: 1.3; }
+  .td-title-input::placeholder { color: #3f3f46; }
+
+  .sec-label { font-size: 11px; color: #a1a1aa; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; display: flex; align-items: center; justify-content: space-between; }
+  .sec-add { font-size: 16px; color: #52525b; cursor: pointer; }
+  .sec-add:hover { color: #f97316; }
+
+  .field-box { background: #18181b; border: 1px solid #27272a; border-radius: 9px; padding: 10px 13px; font-size: 13px; color: #c4c4c7; line-height: 1.65; outline: none; min-height: 52px; word-break: break-word; }
+  .field-box[contenteditable]:empty::before { content: attr(placeholder); color: #3f3f46; }
+  .claude-box { background: #0a0a14; border: 1px solid #2d2b5a; border-radius: 9px; padding: 10px 13px; font-size: 13px; color: #c4c4c7; line-height: 1.65; outline: none; min-height: 80px; max-height: 160px; overflow-y: auto; word-break: break-word; }
+  .claude-box[contenteditable]:empty::before { content: attr(placeholder); color: #2d2b4a; }
+
+  /* Checklist */
+  .checklist { border: 1px solid #27272a; border-radius: 9px; overflow: hidden; }
+  .cl-row { display: flex; align-items: center; gap: 9px; padding: 7px 13px; border-bottom: 1px solid #1c1c20; }
+  .cl-row:last-child { border-bottom: none; }
+  .cl-cb { width: 15px; height: 15px; border-radius: 50%; border: 1.5px solid #3f3f46; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; font-size: 9px; color: transparent; }
+  .cl-cb.done { background: #f97316; border-color: #f97316; color: white; }
+  .cl-text { font-size: 13px; color: #d4d4d8; }
+  .cl-text.done { text-decoration: line-through; color: #3f3f46; }
+  .cl-input-row { padding: 7px 13px; }
+  .cl-input { background: transparent; border: none; outline: none; font-size: 13px; color: #71717a; font-family: inherit; width: 100%; }
+  .cl-input::placeholder { color: #3f3f46; }
+
+  /* ── NOTES VIEW ── */
+  .notes-view { flex: 1; display: none; overflow: hidden; }
+  .notes-layout { display: flex; height: 100%; }
+
+  /* Notes page list (like OneNote pages) */
+  .notes-pages { width: 220px; border-right: 1px solid #27272a; background: #0f0f12; display: flex; flex-direction: column; }
+  .np-header { padding: 12px 12px 6px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1f1f23; }
+  .np-title { font-size: 12px; font-weight: 600; color: #a1a1aa; }
+  .np-add { font-size: 18px; color: #52525b; cursor: pointer; }
+  .np-add:hover { color: #f97316; }
+  .np-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+  .np-item { padding: 8px 12px; cursor: pointer; border-left: 2px solid transparent; }
+  .np-item:hover { background: #18181b; }
+  .np-item.active { background: #1a1a1f; border-left-color: #f97316; }
+  .np-item-title { font-size: 13px; color: #d4d4d8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np-item.active .np-item-title { color: #fde68a; }
+  .np-item-date { font-size: 10px; color: #52525b; margin-top: 2px; }
+
+  /* Notes editor */
+  .notes-editor { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .ne-header { padding: 16px 24px 10px; border-bottom: 1px solid #1f1f23; }
+  .ne-title { font-size: 22px; font-weight: 700; color: #f4f4f5; background: transparent; border: none; outline: none; font-family: inherit; width: 100%; }
+  .ne-title::placeholder { color: #3f3f46; }
+  .ne-meta { font-size: 11px; color: #52525b; margin-top: 4px; }
+  .ne-toolbar { padding: 6px 24px; border-bottom: 1px solid #1f1f23; display: flex; gap: 4px; }
+  .ne-tool { padding: 4px 8px; border-radius: 5px; background: transparent; border: 1px solid transparent; color: #71717a; font-size: 12px; cursor: pointer; }
+  .ne-tool:hover { background: #27272a; color: #d4d4d8; border-color: #3f3f46; }
+  .ne-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
+  .ne-content { min-height: 200px; font-size: 14px; line-height: 1.8; color: #d4d4d8; outline: none; }
+  .ne-content:empty::before { content: 'Start writing...'; color: #3f3f46; }
+
+  /* ── ACTIVITY VIEW ── */
+  .av-feed { display: flex; flex-direction: column; gap: 0; }
+  .av-entry { display: flex; gap: 14px; padding: 12px 0; border-bottom: 1px solid #1a1a1f; }
+  .av-entry:last-child { border-bottom: none; }
+  .av-icon-col { display: flex; flex-direction: column; align-items: center; gap: 0; width: 28px; flex-shrink: 0; }
+  .av-dot { width: 28px; height: 28px; border-radius: 50%; background: #18181b; border: 1.5px solid #3f3f46; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
+  .av-dot.status   { background: #1e3a5f; border-color: #2563eb; }
+  .av-dot.created  { background: #14301a; border-color: #16a34a; }
+  .av-dot.checklist{ background: #1c1c20; border-color: #52525b; }
+  .av-dot.claude   { background: #0a0a14; border-color: #4c1d95; }
+  .av-dot.note     { background: #1c1c20; border-color: #71717a; }
+  .av-content { flex: 1; min-width: 0; }
+  .av-task-name { font-size: 11px; color: #71717a; margin-bottom: 2px; }
+  .av-task-name a { color: #60a5fa; text-decoration: none; cursor: pointer; }
+  .av-text { font-size: 13px; color: #d4d4d8; line-height: 1.5; }
+  .av-text strong { color: #f4f4f5; }
+  .av-chip { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 20px; }
+  .av-chip.from { background: #27272a; color: #a1a1aa; }
+  .av-chip.to   { background: #1e3a5f; color: #60a5fa; }
+  .av-chip.done { background: #14301a; color: #4ade80; }
+  .av-chip.upnext { background: #3d2c00; color: #facc15; }
+  .av-time { font-size: 11px; color: #52525b; margin-top: 3px; }
+  .av-who { display: inline-block; margin-right: 4px; }
+  .av-who.claude { color: #a78bfa; }
+  .av-who.user { color: #71717a; }
+</style>
+</head>
+<body>
+
+<!-- Icon Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-logo">⚡</div>
+  <div class="sidebar-icon">📊</div>
+  <div class="sidebar-icon active">☑</div>
+  <div class="sidebar-icon">📋</div>
+  <div class="sidebar-icon">📂</div>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-icon">⏱</div>
+  <div class="sidebar-icon" style="margin-top:auto">⚙</div>
+</div>
+
+<!-- Project Panel -->
+<div class="project-panel">
+  <div class="pp-header">Projects</div>
+  <div class="pp-item active"><span class="pdot" style="background:#f97316"></span>LIXIL<span class="pbadge">6</span></div>
+  <div class="pp-item"><span class="pdot" style="background:#3b82f6"></span>DailyATR<span class="pbadge">7</span></div>
+  <div class="pp-item"><span class="pdot" style="background:#10b981"></span>TfLS I&D<span class="pbadge">1</span></div>
+  <div class="pp-item"><span class="pdot" style="background:#8b5cf6"></span>Todo app</div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Project-level tabs -->
+  <div class="project-tabs">
+    <div class="proj-tab active" onclick="switchTab('tasks', this)">Tasks</div>
+    <div class="proj-tab" onclick="switchTab('notes', this)">Notes</div>
+  </div>
+
+  <!-- ── TASKS VIEW ── -->
+  <div class="tasks-view" id="view-tasks">
+
+    <!-- Compact task list -->
+    <div class="task-list-panel" id="taskListPanel">
+      <div class="tl-header">
+        <div>
+          <div class="tl-title">LIXIL</div>
+          <div class="tl-count">6 active</div>
+        </div>
+        <div class="tl-add">＋</div>
+      </div>
+      <div class="task-scroll">
+        <div class="tg-header"><span class="tg-chip todo">To Do</span></div>
+        <div class="task-row" onclick="selectTask(this, 'シナリオ作成')">
+          <div class="tr-check"></div>
+          <span class="tr-title">外部結合テストのシナリオ作成</span>
+        </div>
+        <div class="task-row" onclick="selectTask(this, 'チェックリスト')">
+          <div class="tr-check"></div>
+          <span class="tr-title">外部結合の事前チェックリスト</span>
+        </div>
+
+        <div class="tg-header"><span class="tg-chip inprog">In Progress</span></div>
+        <div class="task-row" onclick="selectTask(this, '自動起票')">
+          <div class="tr-check"></div>
+          <span class="tr-title">スレッドからの自動起票の取り組み</span>
+        </div>
+        <div class="task-row selected" onclick="selectTask(this, 'PA自動化')">
+          <div class="tr-check" style="border-color:#f97316"></div>
+          <span class="tr-title">テスト管理自動化 Teams→PA→Excel</span>
+          <span class="tr-cl">5/7</span>
+        </div>
+        <div class="task-row" onclick="selectTask(this, 'AI Knowledge')">
+          <div class="tr-check"></div>
+          <span class="tr-title">AI Knowledge v2 画面</span>
+        </div>
+
+        <div class="tg-header"><span class="tg-chip upnext">Up Next</span></div>
+        <div class="task-row" onclick="selectTask(this, 'セットアップ')">
+          <div class="tr-check"></div>
+          <span class="tr-title">結合テストのセットアップ</span>
+        </div>
+        <div class="add-row">＋ Add task...</div>
+      </div>
+    </div>
+
+    <div class="resize-handle" id="resizeHandle"></div>
+
+    <!-- Task detail -->
+    <div class="task-detail-panel">
+      <div class="td-topbar">
+        <span class="td-breadcrumb">LIXIL <span>›</span> テスト管理自動化</span>
+        <div class="td-toolbar">
+          <button class="tool-btn">🔗 Link</button>
+          <button class="tool-btn danger">🗑</button>
+        </div>
+      </div>
+      <div class="td-fields">
+        <div class="td-field">
+          <div class="td-field-label">Status</div>
+          <div class="td-field-value blue">In Progress</div>
+        </div>
+        <div class="td-field">
+          <div class="td-field-label">Priority</div>
+          <div class="td-field-value pri-medium">Medium</div>
+        </div>
+        <div class="td-field">
+          <div class="td-field-label">Due Date</div>
+          <div class="td-field-value muted">Not set</div>
+        </div>
+        <div class="td-field">
+          <div class="td-field-label">Progress</div>
+          <div class="td-field-value orange">71% (5/7)</div>
+        </div>
+        <div class="td-field">
+          <div class="td-field-label">Project</div>
+          <div class="td-field-value">LIXIL</div>
+        </div>
+      </div>
+
+      <!-- Task-level tabs -->
+      <div class="td-tabs">
+        <div class="td-tab active" onclick="switchTaskTab('details', this)">Details</div>
+        <div class="td-tab" onclick="switchTaskTab('activity', this)">Activity</div>
+      </div>
+
+      <!-- Details pane -->
+      <div class="td-content" id="td-details">
+        <div class="td-body">
+          <input class="td-title-input" value="テスト管理自動化（Teams→PA→Excel）の仕組み構築" />
+
+          <div>
+            <div class="sec-label">☑ Checklist <span class="sec-add">＋</span></div>
+            <div class="checklist">
+              <div class="cl-row"><div class="cl-cb done">✓</div><span class="cl-text done">運用フロー設計・CLAUDE.md / CLAUDE_executor.md 作成</span></div>
+              <div class="cl-row"><div class="cl-cb done">✓</div><span class="cl-text done">Power Automate 定期実行フロー設計</span></div>
+              <div class="cl-row"><div class="cl-cb done">✓</div><span class="cl-text done">PAフロー実装（外結テストチャンネル）</span></div>
+              <div class="cl-row"><div class="cl-cb done">✓</div><span class="cl-text done">OneDrive同期設定</span></div>
+              <div class="cl-row"><div class="cl-cb done">✓</div><span class="cl-text done">Windows Task Scheduler + Claude自動実行の検証</span></div>
+              <div class="cl-row"><div class="cl-cb"></div><span class="cl-text">Claude台帳更新テスト（Excel障害管理表）</span></div>
+              <div class="cl-row"><div class="cl-cb"></div><span class="cl-text">システムテスト用PAフロー作成</span></div>
+              <div class="cl-input-row"><input class="cl-input" placeholder="＋ Add an item... (Enter to save)" /></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="sec-label">📝 Notes</div>
+            <div class="field-box" contenteditable="true" placeholder="Quick notes for yourself..."></div>
+          </div>
+
+          <div>
+            <div class="sec-label">🤖 Claude Context</div>
+            <div class="claude-box" contenteditable="true">## 背景（6/24議事録・大澤さん依頼より）
+大澤さんから「結合テストやシナリオテストで使う、テスト管理の仕組みの検討」を依頼された。
+
+## レファレンス②: 藤井さんメッセージ（6/30）
+障害管理表を更新。外結テスト・システムテストの2チャンネルから、F列で識別する形で起票→対応→確認結果を反映する。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Activity pane -->
+      <div class="td-content" id="td-activity" style="display:none">
+        <div class="td-activity">
+          <div class="av-feed">
+
+            <div class="av-entry">
+              <div class="av-dot claude">🤖</div>
+              <div class="av-content">
+                <div class="av-text">Checklist — <strong>PAフロー実装（外結テストチャンネル）</strong> marked <span class="av-chip done">done</span></div>
+                <div class="av-time"><span class="av-who claude">Claude</span>· Jun 30, 2026 · 14:32</div>
+              </div>
+            </div>
+
+            <div class="av-entry">
+              <div class="av-dot status">⟳</div>
+              <div class="av-content">
+                <div class="av-text">Status <span class="av-chip from">To Do</span> → <span class="av-chip to">In Progress</span></div>
+                <div class="av-time"><span class="av-who user">You</span>· Jun 30, 2026 · 11:15</div>
+              </div>
+            </div>
+
+            <div class="av-entry">
+              <div class="av-dot claude">🤖</div>
+              <div class="av-content">
+                <div class="av-text">Merged with <strong>ID:29 Teams投稿データ抽出用PAの作成</strong> — 7 checklist items added, ID:29 cancelled</div>
+                <div class="av-time"><span class="av-who claude">Claude</span>· Jun 30, 2026 · 10:48</div>
+              </div>
+            </div>
+
+            <div class="av-entry">
+              <div class="av-dot claude">🤖</div>
+              <div class="av-content">
+                <div class="av-text">Claude Context updated — reference added for 大澤さん message (6/24 議事録) and 藤井さん message (6/30)</div>
+                <div class="av-time"><span class="av-who claude">Claude</span>· Jun 30, 2026 · 10:47</div>
+              </div>
+            </div>
+
+            <div class="av-entry">
+              <div class="av-dot checklist">☑</div>
+              <div class="av-content">
+                <div class="av-text">Checklist — <strong>OneDrive同期設定</strong> marked <span class="av-chip done">done</span></div>
+                <div class="av-time"><span class="av-who user">You</span>· Jun 26, 2026 · 13:20</div>
+              </div>
+            </div>
+
+            <div class="av-entry">
+              <div class="av-dot created">＋</div>
+              <div class="av-content">
+                <div class="av-text">Task created</div>
+                <div class="av-time"><span class="av-who user">You</span>· Jun 24, 2026 · 18:10</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── NOTES VIEW ── -->
+  <div class="notes-view" id="view-notes">
+    <div class="notes-layout">
+
+      <!-- Page list -->
+      <div class="notes-pages">
+        <div class="np-header">
+          <span class="np-title">Project Notes</span>
+          <span class="np-add">＋</span>
+        </div>
+        <div class="np-list">
+          <div class="np-item active" onclick="selectNote(this, '進捗メモ', 'Jun 30, 2026', note1)">
+            <div class="np-item-title">進捗メモ</div>
+            <div class="np-item-date">Jun 30, 2026</div>
+          </div>
+          <div class="np-item" onclick="selectNote(this, '6/24 議事録サマリー', 'Jun 24, 2026', note2)">
+            <div class="np-item-title">6/24 議事録サマリー</div>
+            <div class="np-item-date">Jun 24, 2026</div>
+          </div>
+          <div class="np-item" onclick="selectNote(this, 'テスト観点メモ', 'Jun 22, 2026', note3)">
+            <div class="np-item-title">テスト観点メモ</div>
+            <div class="np-item-date">Jun 22, 2026</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Editor -->
+      <div class="notes-editor">
+        <div class="ne-header">
+          <input class="ne-title" id="ne-title" value="進捗メモ" />
+          <div class="ne-meta" id="ne-meta">Last edited Jun 30, 2026</div>
+        </div>
+        <div class="ne-toolbar">
+          <button class="ne-tool"><b>B</b></button>
+          <button class="ne-tool"><i>I</i></button>
+          <button class="ne-tool"><u>U</u></button>
+          <button class="ne-tool">H1</button>
+          <button class="ne-tool">• List</button>
+          <button class="ne-tool">☑ Task</button>
+        </div>
+        <div class="ne-body">
+          <div class="ne-content" id="ne-content" contenteditable="true">PAフロー修正後、再テストが必要。
+
+テキストファイルの中身がconcat()式のまま保存されていた問題を修正済み。
+Overwrite=はいで再実行すると上書きされる。
+
+次のアクション：
+- PAフロー手動実行
+- Claude台帳更新テストを再実行
+- システムテスト用フローの作成</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+</div><!-- /main -->
+
+<script>
+// Project-level tab switching
+function switchTab(tab, el) {
+  document.querySelectorAll('.proj-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('view-tasks').style.display = tab === 'tasks' ? 'flex' : 'none';
+  document.getElementById('view-notes').style.display = tab === 'notes' ? 'flex' : 'none';
+}
+
+// Task-level tab switching (Details / Activity)
+function switchTaskTab(tab, el) {
+  document.querySelectorAll('.td-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('td-details').style.display  = tab === 'details'  ? 'flex' : 'none';
+  document.getElementById('td-activity').style.display = tab === 'activity' ? 'flex' : 'none';
+}
+
+// Task row selection
+function selectTask(el, name) {
+  document.querySelectorAll('.task-row').forEach(r => r.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+// Notes page selection
+const note1 = 'PAフロー修正後、再テストが必要。\n\nテキストファイルの中身がconcat()式のまま保存されていた問題を修正済み。\nOverwrite=はいで再実行すると上書きされる。\n\n次のアクション：\n- PAフロー手動実行\n- Claude台帳更新テストを再実行\n- システムテスト用フローの作成';
+const note2 = '## 6/24 議事録サマリー\n\n大澤さんから「結合テストやシナリオテストで使う、テスト管理の仕組みの検討」を依頼された。\n\n決定事項：\n- 課題管理フロー: Teamsスレッド → Power Automate → Excel自動起票\n- テスト種別ごとに専用Teamsチャネルを分ける\n- シナリオテスト開始: 2026-07-06 予定';
+const note3 = '## テスト観点メモ\n\n外部結合テストで確認すべき観点：\n1. APIレスポンスの整合性\n2. 画面遷移・エラーハンドリング\n3. 権限制御（ロール別アクセス）\n4. データの永続化\n5. 外部システム連携の動作確認';
+
+function selectNote(el, title, date, content) {
+  document.querySelectorAll('.np-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('ne-title').value = title;
+  document.getElementById('ne-meta').textContent = 'Last edited ' + date;
+  document.getElementById('ne-content').innerText = content;
+}
+
+// Resize handle
+const handle = document.getElementById('resizeHandle');
+const panel  = document.getElementById('taskListPanel');
+let dragging = false, startX = 0, startW = 0;
+
+handle.addEventListener('mousedown', e => {
+  dragging = true; startX = e.clientX; startW = panel.offsetWidth;
+  handle.classList.add('dragging');
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+});
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const w = Math.min(520, Math.max(180, startW + e.clientX - startX));
+  panel.style.width = w + 'px';
+});
+document.addEventListener('mouseup', () => {
+  if (!dragging) return;
+  dragging = false;
+  handle.classList.remove('dragging');
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+});
+</script>
+</body>
+</html>

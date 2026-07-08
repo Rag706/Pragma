@@ -11,7 +11,7 @@ echo.
 set "PYTHON=py -3"
 py -3 --version >nul 2>&1
 if errorlevel 1 (
-    set "PYTHON=%LocalAppData%\Programs\Python\Python313\python.exe"
+    set "PYTHON=%LocalAppData%\Programs\Python\Python314\python.exe"
 )
 echo [Python] %PYTHON%
 

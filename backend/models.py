@@ -43,6 +43,7 @@ class Task(Base):
     completed_at = Column(DateTime, nullable=True)
     progress = Column(Integer, default=0)
     notes = Column(Text, default="")
+    details = Column(Text, default="")
     is_focus = Column(Boolean, default=False, nullable=False)
     rank = Column(Integer, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
@@ -87,6 +88,16 @@ class TimeEntry(Base):
     is_break = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
 
+class ProjectNote(Base):
+    __tablename__ = "project_notes"
+    id         = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    title      = Column(String(200), nullable=False, default="")
+    body       = Column(Text, default="")
+    color      = Column(String(20), default="#a1a1aa")
+    position   = Column(Integer, default=0)
+    created_at = Column(DateTime, server_default=func.now())
+
 class ProjectReference(Base):
     __tablename__ = "project_references"
     id = Column(Integer, primary_key=True, index=True)
@@ -96,3 +107,11 @@ class ProjectReference(Base):
     notes = Column(Text, default="")
     ref_type = Column(String(10), default="url")  # url | note | doc
     created_at = Column(DateTime, server_default=func.now())
+
+class ProjectLog(Base):
+    __tablename__ = "project_logs"
+    id         = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    content    = Column(Text, nullable=False)
+    author     = Column(String(20), default="user")  # 'user' | 'claude'
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

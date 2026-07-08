@@ -34,10 +34,10 @@ Double-click: start.bat
 
 Opens two terminal windows (backend + frontend) and launches the browser automatically.
 
-| Service  | URL                     |
-|----------|-------------------------|
-| App      | http://localhost:5173   |
-| API docs | http://localhost:8000/docs |
+| Service  | URL                         |
+|----------|-----------------------------|
+| App      | http://localhost:5173       |
+| API docs | http://localhost:59080/docs |
 
 To stop: close both terminal windows.
 
@@ -48,7 +48,7 @@ To stop: close both terminal windows.
 **Terminal 1 — Backend:**
 ```bash
 cd backend
-python -m uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --reload --port 59080
 ```
 
 **Terminal 2 — Frontend:**
@@ -135,30 +135,35 @@ To reset everything (including projects) to a blank slate:
 ```
 014_todo_application/
 ├── backend/
-│   ├── main.py          # FastAPI app entry point
-│   ├── models.py        # Database models (SQLAlchemy)
-│   ├── schemas.py       # Request/response validation (Pydantic)
-│   ├── database.py      # SQLite connection
-│   ├── seed.py          # Sample data loader
-│   ├── taskflow.db      # SQLite database (auto-created)
+│   ├── main.py            # FastAPI app entry point
+│   ├── models.py          # Database models (SQLAlchemy)
+│   ├── schemas.py         # Request/response validation (Pydantic)
+│   ├── database.py        # SQLite connection
+│   ├── seed.py            # Sample data loader
+│   ├── mcp_server.py      # MCP server for Claude AI integration
+│   ├── taskflow.db        # SQLite database (auto-created on first run)
 │   └── routers/
-│       ├── tasks.py     # Task CRUD endpoints
-│       ├── projects.py  # Project CRUD endpoints
-│       └── stats.py     # Dashboard stats endpoint
+│       ├── tasks.py       # Task CRUD endpoints
+│       ├── projects.py    # Project CRUD endpoints
+│       ├── stats.py       # Dashboard stats endpoint
+│       ├── notes.py       # Project notes/pages endpoints
+│       └── project_logs.py # Project activity log endpoints
 ├── frontend/
 │   └── src/
-│       ├── pages/       # Dashboard, Tasks, Projects
-│       ├── components/  # Sidebar, TaskDrawer, QuickAdd, etc.
-│       └── api/         # API client functions
-├── setup.bat            # First-time setup
-└── start.bat            # Daily launcher
+│       ├── pages/         # Dashboard, Tasks, Projects, Kanban, TimeLog
+│       ├── components/    # Sidebar, TaskDrawer, QuickAdd, RichTextEditor, etc.
+│       ├── api/           # API client functions
+│       └── context/       # React context (Theme, Timer, Toast, Settings)
+├── setup.bat              # First-time setup (run once after cloning)
+├── start.bat              # Daily launcher
+└── CLAUDE.md              # AI assistant instructions for Claude Code
 ```
 
 ---
 
 ## API Reference
 
-Interactive API docs are available at **http://localhost:8000/docs** while the backend is running.
+Interactive API docs are available at **http://localhost:59080/docs** while the backend is running.
 All endpoints are under `/api/`:
 
 | Method | Endpoint | Description |

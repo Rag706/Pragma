@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
-import { getTasks, updateTaskStatus } from '../api/tasks'
+import { Plus, ChevronDown, ChevronRight, Archive } from 'lucide-react'
+import { getTasks, updateTaskStatus, bulkUpdateTasks } from '../api/tasks'
 import { getProjects } from '../api/projects'
 import TaskDrawer from '../components/TaskDrawer'
 import QuickAdd from '../components/QuickAdd'
@@ -31,13 +31,15 @@ function hexToRgba(hex, a) {
   return `rgba(${r},${g},${b},${a})`
 }
 
-function formatDue(due) {
+function formatDue(due, isDone = false) {
   if (!due) return null
   try {
     const d = parseISO(due)
     if (isToday(d))    return { label: 'Today',    cls: 'text-yellow-400 bg-yellow-400/10' }
     if (isTomorrow(d)) return { label: 'Tomorrow', cls: 'text-zinc-400 bg-zinc-700/50'    }
-    if (isPast(d))     return { label: `${Math.ceil((Date.now() - d) / 86400000)}d overdue`, cls: 'text-red-400 bg-red-500/10' }
+    if (isPast(d))     return isDone
+      ? { label: format(d, 'MMM d'), cls: 'text-zinc-600 bg-zinc-800' }
+      : { label: `${Math.ceil((Date.now() - d) / 86400000)}d overdue`, cls: 'text-red-400 bg-red-500/10' }
     return { label: format(d, 'MMM d'), cls: 'text-zinc-500 bg-zinc-800' }
   } catch { return null }
 }
@@ -49,6 +51,7 @@ export default function Kanban() {
   const [quickAddOpen, setQuickAddOpen]   = useState(false)
   const [dragging, setDragging]           = useState(null)
   const [dragOver, setDragOver]           = useState(null)
+  const [showOlderDone, setShowOlderDone] = useState(false)
   const [colWidths, setColWidths]         = useState(() => {
     try { return JSON.parse(localStorage.getItem('pragma_col_widths') || '{}') }
     catch { return {} }
@@ -67,6 +70,15 @@ export default function Kanban() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
       qc.invalidateQueries({ queryKey: ['stats'] })
+    },
+  })
+
+  const archiveMutation = useMutation({
+    mutationFn: (ids) => bulkUpdateTasks(ids, { status: 'cancelled' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      qc.invalidateQueries({ queryKey: ['stats'] })
+      setShowOlderDone(false)
     },
   })
 
@@ -157,6 +169,10 @@ export default function Kanban() {
             const countColor = ['up_next', 'in_progress', 'review', 'done'].includes(col.key) && tasks.length > 0
               ? col.hex : '#71717a'
 
+            const todayStart = new Date(); todayStart.setHours(0,0,0,0)
+            const todayDone  = col.key === 'done' ? tasks.filter(t => new Date(t.updated_at ?? t.created_at) >= todayStart) : tasks
+            const olderDone  = col.key === 'done' ? tasks.filter(t => new Date(t.updated_at ?? t.created_at) <  todayStart) : []
+
             return (
               <div key={col.key} className="shrink-0 flex flex-col relative" style={{ width: colWidths[col.key] ?? 272 }}>
                 {/* Column header */}
@@ -165,12 +181,26 @@ export default function Kanban() {
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: col.hex }} />
                     {col.label}
                   </div>
-                  <span
-                    className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full"
-                    style={{ backgroundColor: countBg, color: countColor }}
-                  >
-                    {tasks.length}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {col.key === 'done' && olderDone.length > 0 && (
+                      <button
+                        onClick={() => {
+                          if (confirm(`Archive ${olderDone.length} older done task${olderDone.length > 1 ? 's' : ''}?\n\nThey will move to Cancelled.`))
+                            archiveMutation.mutate(olderDone.map(t => t.id))
+                        }}
+                        title="Archive older done tasks"
+                        className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10 px-1.5 py-0.5 rounded transition-colors"
+                      >
+                        <Archive size={10} /> Archive
+                      </button>
+                    )}
+                    <span
+                      className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full"
+                      style={{ backgroundColor: countBg, color: countColor }}
+                    >
+                      {tasks.length}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Column body */}
@@ -183,7 +213,7 @@ export default function Kanban() {
                   onDrop={e => handleDrop(e, col.key)}
                   onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(null) }}
                 >
-                  {tasks.map(task => (
+                  {todayDone.map(task => (
                     <KanbanCard
                       key={task.id}
                       task={task}
@@ -194,6 +224,31 @@ export default function Kanban() {
                       onClick={() => setSelectedTask(task)}
                     />
                   ))}
+
+                  {/* Older done tasks accordion */}
+                  {olderDone.length > 0 && (
+                    <div className="mt-1">
+                      <button
+                        onClick={() => setShowOlderDone(o => !o)}
+                        className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 rounded-lg transition-colors"
+                      >
+                        {showOlderDone ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                        Completed earlier ({olderDone.length})
+                      </button>
+                      {showOlderDone && olderDone.map(task => (
+                        <div key={task.id} className="mt-1.5 opacity-60">
+                          <KanbanCard
+                            task={task}
+                            project={projectMap[task.project_id]}
+                            isDragging={dragging?.id === task.id}
+                            onDragStart={e => handleDragStart(e, task)}
+                            onDragEnd={() => { setDragging(null); setDragOver(null) }}
+                            onClick={() => setSelectedTask(task)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {isOver && dragging && (
                     <div className="border-2 border-dashed border-zinc-600 rounded-lg h-12 flex items-center justify-center text-[11px] text-zinc-600 shrink-0">
@@ -240,8 +295,8 @@ export default function Kanban() {
 }
 
 function KanbanCard({ task, project, isDragging, onDragStart, onDragEnd, onClick }) {
-  const due    = formatDue(task.due_date)
   const isDone = task.status === 'done' || task.status === 'cancelled'
+  const due    = formatDue(task.due_date, isDone)
 
   const cardStyle = project ? {
     background:   hexToRgba(project.color, 0.09),
@@ -264,9 +319,12 @@ function KanbanCard({ task, project, isDragging, onDragStart, onDragEnd, onClick
       style={cardStyle}
     >
       {/* Title */}
-      <p className={`text-[13px] leading-snug mb-2 ${isDone ? 'line-through text-zinc-600' : 'text-zinc-200'}`}>
-        {task.title}
-      </p>
+      <div className="flex items-start gap-1.5 mb-2">
+        <span className="text-[10px] font-mono text-zinc-600 shrink-0 mt-0.5">#{task.id}</span>
+        <p className={`text-[13px] leading-snug ${isDone ? 'line-through text-zinc-600' : 'text-zinc-200'}`}>
+          {task.title}
+        </p>
+      </div>
 
       {/* Progress / checklist bar */}
       {task.checklist_items?.length > 0 ? (() => {

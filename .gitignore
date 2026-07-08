@@ -28,6 +28,9 @@ frontend/.vite/
 Thumbs.db
 desktop.ini
 
+# Claude Code AI memory (user-specific, not part of the project)
+.claude/
+
 # Editor
 .vscode/
 .idea/
