@@ -1,5 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
+import ReminderBell from './ReminderBell'
+import FloatingAddButton from './FloatingAddButton'
 
 export default function Layout() {
   return (
@@ -8,6 +10,8 @@ export default function Layout() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Outlet />
       </div>
+      <ReminderBell />
+      <FloatingAddButton />
     </div>
   )
 }

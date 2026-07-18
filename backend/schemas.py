@@ -61,6 +61,7 @@ class TaskBase(BaseModel):
     status: STATUS_VALUES = "todo"
     status_note: Optional[str] = ""
     due_date: Optional[str] = None
+    remind_at: Optional[str] = None
     start_date: Optional[str] = None
     progress: int = 0
     notes: Optional[str] = ""
@@ -78,6 +79,7 @@ class TaskUpdate(BaseModel):
     status: Optional[STATUS_VALUES] = None
     status_note: Optional[str] = None
     due_date: Optional[str] = None
+    remind_at: Optional[str] = None
     start_date: Optional[str] = None
     progress: Optional[int] = None
     notes: Optional[str] = None
@@ -200,6 +202,7 @@ class NoteUpdate(BaseModel):
     title: Optional[str] = None
     body: Optional[str] = None
     color: Optional[str] = None
+    project_id: Optional[int] = None
 
 class NoteOut(BaseModel):
     id: int

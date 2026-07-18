@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { X, Trash2, Calendar, Flag, Layers, AlignLeft, BarChart2, Clock, Plus, Loader2, Tag, Link2, Pencil, ExternalLink, ListChecks, ChevronDown, ChevronRight, Star, Bot } from 'lucide-react'
+import { X, Trash2, Calendar, Flag, Layers, AlignLeft, BarChart2, Clock, Plus, Loader2, Tag, Link2, Pencil, ExternalLink, ListChecks, ChevronDown, ChevronRight, Star, Bot, Bell } from 'lucide-react'
 import { updateTask, deleteTask } from '../api/tasks'
 import { getProjects } from '../api/projects'
 import { getTaskLogs, createTaskLog, deleteTaskLog } from '../api/taskLogs'
@@ -9,7 +9,7 @@ import { getTaskLinks, createTaskLink, updateTaskLink, deleteTaskLink } from '..
 import { getChecklist, createChecklistItem, updateChecklistItem, deleteChecklistItem } from '../api/checklist'
 import { STATUS_CONFIG, STATUS_GROUPS, PRIORITY_CONFIG } from './Badge'
 import RichTextEditor from './RichTextEditor'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, subDays } from 'date-fns'
 const PRIORITIES = Object.entries(PRIORITY_CONFIG).map(([v, c]) => ({ value: v, label: c.label }))
 const PROGRESS_STEPS = [0,10,20,30,40,50,60,70,80,90,100]
 
@@ -35,7 +35,9 @@ export default function TaskDrawer({ task, onClose, onDeleted, noBackdrop = fals
   const [activeTab, setActiveTab] = useState('details')
   const [logText, setLogText] = useState('')
   const qc = useQueryClient()
-  const logInputRef = useRef(null)
+  const logInputRef    = useRef(null)
+  const remindInputRef = useRef(null)
+  const dueDateInputRef = useRef(null)
 
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
 
@@ -214,16 +216,39 @@ export default function TaskDrawer({ task, onClose, onDeleted, noBackdrop = fals
           </div>
 
           {/* Due Date */}
-          <div className="relative px-4 py-2.5 border-r border-zinc-800 shrink-0 hover:bg-violet-500/10 transition-colors group">
-            <div className="text-[9px] font-bold uppercase tracking-widest text-zinc-600 mb-1 group-hover:text-violet-500/70 transition-colors pointer-events-none">Due Date</div>
-            <div className="text-[12px] font-medium pointer-events-none" style={{ color: form.due_date ? '#d4d4d8' : '#52525b' }}>
-              {form.due_date ? format(parseISO(form.due_date), 'MMM d') : 'None'}
+          <div
+            className="relative px-4 py-2.5 border-r border-zinc-800 shrink-0 hover:bg-violet-500/10 transition-colors group cursor-pointer"
+            onClick={() => dueDateInputRef.current?.showPicker()}
+          >
+            <div className="text-[9px] font-bold uppercase tracking-widest text-zinc-600 mb-1 group-hover:text-violet-500/70 transition-colors">Due Date</div>
+            <div className="text-[12px] font-medium" style={{ color: form.due_date ? '#d4d4d8' : '#52525b' }}>
+              {form.due_date ? format(parseISO(form.due_date), 'MMM d') : 'Set date'}
             </div>
             <input
+              ref={dueDateInputRef}
               type="date"
               value={form.due_date ?? ''}
               onChange={e => saveField('due_date', e.target.value || null)}
-              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              className="absolute inset-0 opacity-0 w-0 h-0"
+            />
+          </div>
+
+          {/* Remind At */}
+          <div
+            className="relative px-4 py-2.5 border-r border-zinc-800 shrink-0 hover:bg-amber-500/10 transition-colors group cursor-pointer"
+            onClick={() => remindInputRef.current?.showPicker()}
+          >
+            <div className="text-[9px] font-bold uppercase tracking-widest text-zinc-600 mb-1 group-hover:text-amber-500/70 transition-colors">Remind At</div>
+            <div className="text-[12px] font-medium flex items-center gap-1" style={{ color: form.remind_at ? '#fbbf24' : '#52525b' }}>
+              <Bell size={10} className={form.remind_at ? 'text-amber-400' : 'text-zinc-600 group-hover:text-amber-500/50'} />
+              {form.remind_at ? format(parseISO(form.remind_at), 'MMM d') : 'Set date'}
+            </div>
+            <input
+              ref={remindInputRef}
+              type="date"
+              value={form.remind_at ?? ''}
+              onChange={e => saveField('remind_at', e.target.value || null)}
+              className="absolute inset-0 opacity-0 w-0 h-0"
             />
           </div>
 
@@ -571,6 +596,42 @@ export default function TaskDrawer({ task, onClose, onDeleted, noBackdrop = fals
                     onChange={(e) => saveField('start_date', e.target.value || null)}
                     className={fieldCls}
                   />
+                </Field>
+
+                <Field icon={<Bell size={13} className={form.remind_at ? 'text-amber-400' : ''} />} label="Remind At">
+                  <div className="space-y-2">
+                    <input
+                      type="date"
+                      value={form.remind_at ?? ''}
+                      onChange={(e) => saveField('remind_at', e.target.value || null)}
+                      className={fieldCls}
+                    />
+                    <div className="flex gap-1.5 flex-wrap">
+                      {[['1日前', 1], ['2日前', 2], ['3日前', 3], ['1週間前', 7]].map(([label, days]) => (
+                        <button
+                          key={label}
+                          type="button"
+                          disabled={!form.due_date}
+                          onClick={() => {
+                            const d = subDays(parseISO(form.due_date), days)
+                            saveField('remind_at', format(d, 'yyyy-MM-dd'))
+                          }}
+                          className="px-2 py-1 text-[11px] rounded-md bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-amber-400 hover:border-amber-500/40 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                      {form.remind_at && (
+                        <button
+                          type="button"
+                          onClick={() => saveField('remind_at', null)}
+                          className="px-2 py-1 text-[11px] rounded-md bg-zinc-800 border border-zinc-700 text-zinc-500 hover:text-red-400 hover:border-red-500/40 transition-colors"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </Field>
               </div>
 

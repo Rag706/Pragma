@@ -6,6 +6,7 @@ import { ToastProvider, showToast } from './context/ToastContext'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Tasks from './pages/Tasks'
+import Today from './pages/Today'
 import Projects from './pages/Projects'
 import TimeLog from './pages/TimeLog'
 import Settings from './pages/Settings'
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
+            <Route path="today" element={<Today />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="projects" element={<Projects />} />
             <Route path="timelog" element={<TimeLog />} />

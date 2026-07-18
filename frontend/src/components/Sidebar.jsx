@@ -1,17 +1,28 @@
 import { useState } from 'react'
 import { NavLink, Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { LayoutDashboard, ListTodo, FolderKanban, LayoutGrid, Zap, Settings, ChevronLeft, ChevronRight, Clock as TimeIcon } from 'lucide-react'
+import { LayoutDashboard, ListTodo, FolderKanban, LayoutGrid, Zap, Settings, ChevronLeft, ChevronRight, Clock as TimeIcon, CalendarClock, Inbox } from 'lucide-react'
 import { getProjects } from '../api/projects'
-import { getStats } from '../api/stats'
+import { getTasks } from '../api/tasks'
+import { parseISO, isToday, isPast } from 'date-fns'
+
+const TRAY_PROJECT_ID = 11
 
 export default function Sidebar() {
-  const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
-  const { data: stats }         = useQuery({ queryKey: ['stats'],    queryFn: getStats })
+  const { data: allProjects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
+  const trayProject = allProjects.find(p => p.id === TRAY_PROJECT_ID) ?? null
+  const projects    = allProjects.filter(p => p.id !== TRAY_PROJECT_ID)
+  const { data: allTasks  = [] } = useQuery({ queryKey: ['tasks'],    queryFn: getTasks, staleTime: 60_000 })
 
-  const taskCountMap = Object.fromEntries(
-    (stats?.project_stats ?? []).map(p => [p.id, p.total - (p.done ?? 0) - (p.cancelled ?? 0)])
-  )
+  // Per-project alert counts (uses cached allTasks — no extra network call)
+  const projectAlerts = Object.fromEntries(projects.map(p => {
+    const pActive  = allTasks.filter(t => t.project_id === p.id && !['done', 'cancelled'].includes(t.status))
+    const overdue  = pActive.filter(t => t.due_date && isPast(parseISO(t.due_date)) && !isToday(parseISO(t.due_date))).length
+    const dueToday = pActive.filter(t => t.due_date && isToday(parseISO(t.due_date))).length
+    return [p.id, { overdue, dueToday }]
+  }))
+
+  const globalOverdue = Object.values(projectAlerts).reduce((s, a) => s + a.overdue, 0)
 
   const navigate       = useNavigate()
   const location       = useLocation()
@@ -63,6 +74,11 @@ export default function Sidebar() {
           {!collapsed && 'Dashboard'}
         </NavLink>
 
+        <NavLink to="/today" className={navClass} title={collapsed ? 'Today' : undefined}>
+          <CalendarClock size={15} className="shrink-0" />
+          {!collapsed && <><span className="flex-1">Today</span>{globalOverdue > 0 && <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-rose-950 text-rose-400 border border-rose-900 shrink-0 animate-pulse">{globalOverdue}</span>}</>}
+        </NavLink>
+
         <NavLink
           to="/tasks"
           end
@@ -88,45 +104,94 @@ export default function Sidebar() {
           {!collapsed && 'Time Log'}
         </NavLink>
 
+        {/* Tray — dedicated quick-capture nav item */}
+        {!collapsed && trayProject && (
+          <div className="pt-3">
+            <p className="px-3 pb-1.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+              Quick Capture
+            </p>
+            <Link
+              to={`/tasks?project=${TRAY_PROJECT_ID}`}
+              className={`${navBase} ${activeProjectId === String(TRAY_PROJECT_ID) ? 'bg-indigo-950/60 text-indigo-300 border border-indigo-900/50' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'}`}
+            >
+              <Inbox size={15} className="shrink-0" />
+              <span className="flex-1 truncate">Tray</span>
+            </Link>
+          </div>
+        )}
+        {collapsed && trayProject && (
+          <div className="pt-3">
+            <Link
+              to={`/tasks?project=${TRAY_PROJECT_ID}`}
+              title="Tray"
+              className={`flex justify-center py-2 rounded-lg transition-colors relative ${
+                activeProjectId === String(TRAY_PROJECT_ID) ? 'bg-indigo-950/60' : 'hover:bg-zinc-800/60'
+              }`}
+            >
+              <Inbox size={15} className={activeProjectId === String(TRAY_PROJECT_ID) ? 'text-indigo-300' : 'text-zinc-500'} />
+            </Link>
+          </div>
+        )}
+
         {/* Project quick links — hidden when collapsed */}
         {!collapsed && projects.length > 0 && (
           <div className="pt-4">
             <p className="px-3 pb-1.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
               Projects
             </p>
-            {projects.map(p => (
-              <Link
-                key={p.id}
-                to={`/tasks?project=${p.id}`}
-                className={`${navBase} ${activeProjectId === String(p.id) ? navActive : navIdle}`}
-              >
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
-                <span className="truncate flex-1">{p.name}</span>
-                {taskCountMap[p.id] > 0 && (
-                  <span className="text-[10px] bg-zinc-700 text-zinc-400 rounded-full px-1.5 py-0.5 leading-none shrink-0">
-                    {taskCountMap[p.id]}
-                  </span>
-                )}
-              </Link>
-            ))}
+            {projects.map(p => {
+              const alert = projectAlerts[p.id] ?? { overdue: 0, dueToday: 0 }
+              return (
+                <Link
+                  key={p.id}
+                  to={`/tasks?project=${p.id}`}
+                  className={`${navBase} ${activeProjectId === String(p.id) ? navActive : navIdle}`}
+                >
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                  <span className="truncate flex-1">{p.name}</span>
+                  {alert.overdue > 0 && (
+                    <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-rose-950 text-rose-400 border border-rose-900 shrink-0">
+                      {alert.overdue}
+                    </span>
+                  )}
+                  {alert.overdue === 0 && alert.dueToday > 0 && (
+                    <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-amber-950/60 text-amber-400 border border-amber-900/60 shrink-0">
+                      {alert.dueToday}
+                    </span>
+                  )}
+                  {alert.overdue === 0 && alert.dueToday === 0 && (
+                    <span className="text-[10px] font-bold text-emerald-700 shrink-0">✓</span>
+                  )}
+                </Link>
+              )
+            })}
           </div>
         )}
 
         {/* Collapsed: project color dots only */}
         {collapsed && projects.length > 0 && (
           <div className="pt-3 space-y-0.5">
-            {projects.map(p => (
-              <Link
-                key={p.id}
-                to={`/tasks?project=${p.id}`}
-                title={p.name}
-                className={`flex justify-center py-2 rounded-lg transition-colors ${
-                  activeProjectId === String(p.id) ? 'bg-zinc-800' : 'hover:bg-zinc-800/60'
-                }`}
-              >
-                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
-              </Link>
-            ))}
+            {projects.map(p => {
+              const alert = projectAlerts[p.id] ?? { overdue: 0, dueToday: 0 }
+              return (
+                <Link
+                  key={p.id}
+                  to={`/tasks?project=${p.id}`}
+                  title={`${p.name}${alert.overdue > 0 ? ` — ${alert.overdue} overdue` : alert.dueToday > 0 ? ` — ${alert.dueToday} due today` : ''}`}
+                  className={`flex justify-center py-2 rounded-lg transition-colors relative ${
+                    activeProjectId === String(p.id) ? 'bg-zinc-800' : 'hover:bg-zinc-800/60'
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+                  {alert.overdue > 0 && (
+                    <span className="absolute top-1 right-1.5 w-1.5 h-1.5 rounded-full bg-rose-400" />
+                  )}
+                  {alert.overdue === 0 && alert.dueToday > 0 && (
+                    <span className="absolute top-1 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  )}
+                </Link>
+              )
+            })}
           </div>
         )}
 

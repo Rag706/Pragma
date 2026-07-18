@@ -22,11 +22,13 @@ export const STATUS_GROUPS = [
   {
     label: 'Status',
     options: [
-      { value: 'backlog',     label: 'Backlog'     },
       { value: 'todo',        label: 'To Do'       },
       { value: 'up_next',     label: 'Up Next'     },
       { value: 'in_progress', label: 'In Progress' },
       { value: 'review',      label: 'Review'      },
+      { value: 'testing',     label: 'Testing'     },
+      { value: 'waiting',     label: 'Waiting'     },
+      { value: 'on_hold',     label: 'On Hold'     },
       { value: 'done',        label: 'Done'        },
       { value: 'cancelled',   label: 'Cancelled'   },
     ],

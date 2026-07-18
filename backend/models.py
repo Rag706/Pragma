@@ -39,6 +39,7 @@ class Task(Base):
     status = Column(String(20), default="todo")
     status_note = Column(String(200), nullable=True, default="")
     due_date = Column(String(10), nullable=True)
+    remind_at = Column(String(10), nullable=True)
     start_date = Column(String(10), nullable=True)
     completed_at = Column(DateTime, nullable=True)
     progress = Column(Integer, default=0)

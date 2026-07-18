@@ -1,18 +1,21 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, CheckCircle2, Circle, Clock, PauseCircle, XCircle, SlidersHorizontal, Trash, ArrowUpDown, ArrowUp, ArrowDown, Check, MoreHorizontal, HelpCircle, Archive, Lightbulb, Eye, FlaskConical, Ban, MinusCircle, ChevronDown, ChevronRight, Star, ArrowRight, StickyNote, Plus, GripHorizontal, Bot, Loader2 } from 'lucide-react'
+import { Search, CheckCircle2, Circle, Clock, PauseCircle, XCircle, SlidersHorizontal, Trash, ArrowUpDown, ArrowUp, ArrowDown, Check, MoreHorizontal, HelpCircle, Archive, Lightbulb, Eye, FlaskConical, Ban, MinusCircle, ChevronDown, ChevronRight, Star, ArrowRight, StickyNote, Plus, GripHorizontal, Bot, Loader2, Bell } from 'lucide-react'
 import { getTasks, updateTask, updateTaskStatus, deleteTask, deleteAllTasks, bulkDeleteTasks, bulkUpdateTasks } from '../api/tasks'
 import { getProjects } from '../api/projects'
 import { getProjectNotes, createNote, updateNote, deleteNote, reorderNotes } from '../api/notes'
 import { getProjectLogs, createProjectLog, deleteProjectLog } from '../api/projectLogs'
 import RichTextEditor from '../components/RichTextEditor'
-import { PriorityBadge, ProjectDot, STATUS_CONFIG, STATUS_GROUPS } from '../components/Badge'
+import { PriorityBadge, ProjectDot, STATUS_CONFIG, STATUS_GROUPS, PRIORITY_CONFIG } from '../components/Badge'
 import TaskDrawer from '../components/TaskDrawer'
 import QuickAdd from '../components/QuickAdd'
 import { useSettings } from '../context/SettingsContext'
 import { format, parseISO, isToday, isTomorrow, isPast, differenceInDays } from 'date-fns'
 import clsx from 'clsx'
+
+const TRAY_PROJECT_ID = 11
 
 const NOTE_COLORS = [
   { name: 'Zinc',   accent: '#a1a1aa' },
@@ -718,6 +721,7 @@ export default function Tasks() {
                     selectedTask={selectedTask}
                     onSelect={openTask}
                     isCompletedFilter={isCompletedFilter}
+                    projectMap={projectMap}
                   />
                 )}
               </div>
@@ -807,6 +811,23 @@ export default function Tasks() {
                     <span className="mx-1.5 text-zinc-700">›</span>
                     <span className="text-zinc-400">{selectedPage.title || 'Untitled'}</span>
                   </div>
+                  {activeProject?.id === TRAY_PROJECT_ID && (
+                    <select
+                      defaultValue=""
+                      onChange={e => {
+                        if (!e.target.value) return
+                        updateNoteMutation.mutate({ id: selectedPageId, data: { project_id: Number(e.target.value) } })
+                        e.target.value = ''
+                      }}
+                      className="text-[11px] bg-zinc-900 border border-zinc-700 rounded-md px-2 py-1 text-zinc-400 focus:outline-none focus:border-indigo-500 shrink-0"
+                      title="Move note to project"
+                    >
+                      <option value="">Move to project…</option>
+                      {projects.filter(p => p.id !== TRAY_PROJECT_ID).map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  )}
                   <div className="flex items-center gap-1.5 shrink-0">
                     {NOTE_COLORS.map(c => (
                       <button key={c.accent} onClick={() => changePageColor(c.accent)} title={c.name}
@@ -923,6 +944,65 @@ export default function Tasks() {
   )
 }
 
+function HoverPreview({ info, projectMap }) {
+  if (!info) return null
+  const { task: t, rect } = info
+  const proj   = t.project_id ? (projectMap?.[t.project_id] ?? null) : null
+  const pill   = STATUS_PILL_STYLE[t.status] ?? STATUS_PILL_STYLE.todo
+  const cfg    = STATUS_CONFIG[t.status]     ?? STATUS_CONFIG.todo
+  const pColor = { high: '#fca5a5', medium: '#fcd34d', low: '#86efac' }[t.priority] ?? '#a1a1aa'
+  const pLabel = { high: 'High',   medium: 'Medium',  low: 'Low'    }[t.priority] ?? 'Medium'
+
+  let dueLabel = null, dueColor = '#a1a1aa'
+  if (t.due_date) {
+    const d = parseISO(t.due_date)
+    if      (isPast(d) && !isToday(d)) { dueLabel = '期限切れ'; dueColor = '#f87171' }
+    else if (isToday(d))               { dueLabel = 'Today';    dueColor = '#fbbf24' }
+    else if (isTomorrow(d))            { dueLabel = '明日';     dueColor = '#fde68a' }
+    else                               { dueLabel = format(d, 'M/d') }
+  }
+
+  const W  = 240
+  let left = rect.right + 10
+  let top  = Math.max(8, rect.top - 8)
+  if (left + W > window.innerWidth - 8) left = rect.left - W - 10
+
+  return createPortal(
+    <div style={{
+      position: 'fixed', top, left, width: W, zIndex: 9999,
+      background: '#18181b', border: '1px solid #3f3f46',
+      borderRadius: 12, overflow: 'hidden',
+      boxShadow: '0 8px 24px rgba(0,0,0,.65)',
+      pointerEvents: 'none',
+    }}>
+      {proj && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderBottom: '1px solid #27272a' }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: proj.color, flexShrink: 0 }} />
+          <span style={{ fontSize: 10, color: '#71717a' }}>{proj.name}</span>
+        </div>
+      )}
+      <div style={{ padding: '9px 12px' }}>
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: pill.bg, color: pill.color }}>
+            {cfg.label}
+          </span>
+          <span style={{ fontSize: 10, fontWeight: 600, color: pColor }}>{pLabel}</span>
+          {dueLabel && <span style={{ fontSize: 10, fontWeight: 700, color: dueColor }}>{dueLabel}</span>}
+        </div>
+        <div style={{
+          fontSize: 11, lineHeight: 1.55,
+          color: t.notes ? '#a1a1aa' : '#52525b',
+          fontStyle: t.notes ? 'normal' : 'italic',
+          display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>
+          {t.notes || 'メモなし'}
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 const COMPACT_CHIP = {
   in_progress: { color: '#818cf8', label: 'In Progress', tint: 'rgba(129,140,248,.05)' },
   up_next:     { color: '#fbbf24', label: 'Up Next',     tint: 'rgba(251,191,36,.04)'  },
@@ -937,7 +1017,12 @@ const COMPACT_CHIP = {
 }
 const COMPACT_GROUP_ORDER = ['in_progress', 'up_next', 'todo', 'blocked', 'on_hold', 'waiting', 'planning', 'review', 'testing', 'backlog']
 
-function CompactTaskList({ tasks, completedTasks, showCompleted, setShowCompleted, selectedTask, onSelect, isCompletedFilter }) {
+function CompactTaskList({ tasks, completedTasks, showCompleted, setShowCompleted, selectedTask, onSelect, isCompletedFilter, projectMap }) {
+  const hoverTimer                 = useRef(null)
+  const [hoveredInfo, setHoveredInfo] = useState(null)
+
+  useEffect(() => () => clearTimeout(hoverTimer.current), [])
+
   return (
     <div className="pb-4">
       {COMPACT_GROUP_ORDER.map(status => {
@@ -972,8 +1057,17 @@ function CompactTaskList({ tasks, completedTasks, showCompleted, setShowComplete
                     onClick={() => onSelect(task)}
                     className="flex items-center gap-2 px-2.5 py-[5px] cursor-pointer transition-colors"
                     style={isSelected ? { background: 'rgba(249,115,22,.12)' } : {}}
-                    onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(255,255,255,.04)' }}
-                    onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = '' }}
+                    onMouseEnter={e => {
+                      if (!isSelected) e.currentTarget.style.background = 'rgba(255,255,255,.04)'
+                      clearTimeout(hoverTimer.current)
+                      const el = e.currentTarget
+                      hoverTimer.current = setTimeout(() => setHoveredInfo({ task, rect: el.getBoundingClientRect() }), 400)
+                    }}
+                    onMouseLeave={e => {
+                      if (!isSelected) e.currentTarget.style.background = ''
+                      clearTimeout(hoverTimer.current)
+                      setHoveredInfo(null)
+                    }}
                   >
                     <div className={`w-[13px] h-[13px] rounded-full border shrink-0 transition-colors ${
                       isSelected ? 'border-orange-400' : 'border-zinc-600'
@@ -986,6 +1080,20 @@ function CompactTaskList({ tasks, completedTasks, showCompleted, setShowComplete
                     }`}>
                       {task.title}
                     </span>
+                    {task.remind_at && !['done','cancelled'].includes(task.status) &&
+                      (isToday(parseISO(task.remind_at)) || isPast(parseISO(task.remind_at))) && (
+                      <Bell size={10} className="text-amber-400 shrink-0" />
+                    )}
+                    {task.due_date && !['done','cancelled'].includes(task.status) && (() => {
+                      const diff = differenceInDays(parseISO(task.due_date), new Date())
+                      if (isToday(parseISO(task.due_date)) || isPast(parseISO(task.due_date)))
+                        return <Clock size={10} className="text-rose-400 shrink-0" />
+                      if (diff <= 2)
+                        return <Clock size={10} className="text-orange-400 shrink-0" />
+                      if (diff <= 3)
+                        return <Clock size={10} className="text-yellow-400 shrink-0" />
+                      return null
+                    })()}
                     {cl.length > 0 && (
                       <span className="text-[10px] text-orange-400 shrink-0 font-medium">{clDone}/{cl.length}</span>
                     )}
@@ -1021,6 +1129,7 @@ function CompactTaskList({ tasks, completedTasks, showCompleted, setShowComplete
           ))}
         </div>
       )}
+      <HoverPreview info={hoveredInfo} projectMap={projectMap} />
     </div>
   )
 }
