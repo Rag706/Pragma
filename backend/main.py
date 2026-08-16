@@ -57,3 +57,7 @@ app.include_router(project_logs.router)
 @app.get("/")
 def health():
     return {"status": "ok", "app": "TaskFlow"}
+
+@app.get("/api/health")
+def api_health():
+    return {"status": "ok"}

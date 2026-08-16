@@ -12,10 +12,12 @@ import { PriorityBadge, ProjectDot, STATUS_CONFIG, STATUS_GROUPS, PRIORITY_CONFI
 import TaskDrawer from '../components/TaskDrawer'
 import QuickAdd from '../components/QuickAdd'
 import { useSettings } from '../context/SettingsContext'
+import { useQuickMemo } from '../context/QuickMemoContext'
 import { format, parseISO, isToday, isTomorrow, isPast, differenceInDays } from 'date-fns'
 import clsx from 'clsx'
 
 const TRAY_PROJECT_ID = 11
+const EMPTY_ARR = []   // stable reference — prevents useQuery defaults from causing render loops
 
 const NOTE_COLORS = [
   { name: 'Zinc',   accent: '#a1a1aa' },
@@ -199,6 +201,7 @@ function formatDue(dateStr, isDone = false) {
 
 export default function Tasks() {
   const { settings } = useSettings()
+  const { isOpen: quickMemoOpen, previewTask } = useQuickMemo()
   const [searchParams, setSearchParams] = useSearchParams()
   const qc = useQueryClient()
   const [selectedTask, setSelectedTask]   = useState(null)
@@ -287,6 +290,10 @@ export default function Tasks() {
   }, [])
 
   function openTask(task) {
+    if (quickMemoOpen) {
+      previewTask(task)
+      return
+    }
     setQuickAddOpen(false)
     setSelectedTask(task)
   }
@@ -354,12 +361,12 @@ export default function Tasks() {
     ...(dueFilter     && { due_filter: dueFilter }),
   }
 
-  const { data: tasks = [], isLoading } = useQuery({
+  const { data: tasks = EMPTY_ARR, isLoading } = useQuery({
     queryKey: ['tasks', params],
     queryFn: () => getTasks(params),
   })
 
-  const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
+  const { data: projects = EMPTY_ARR } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
   const projectMap = Object.fromEntries(projects.map((p) => [p.id, p]))
 
   // Auto-open drawer when navigated from dashboard with ?open=id
@@ -484,7 +491,7 @@ export default function Tasks() {
   // Reset to tasks view when project changes
   useEffect(() => { setActiveView('tasks'); setSelectedPageId(null) }, [projectFilter])
 
-  const { data: notes = [] } = useQuery({
+  const { data: notes = EMPTY_ARR } = useQuery({
     queryKey: ['notes', projectFilter],
     queryFn:  () => getProjectNotes(Number(projectFilter)),
     enabled:  !!projectFilter,
@@ -493,7 +500,7 @@ export default function Tasks() {
   // ── Activity log state ─────────────────────────────────────────
   const [activityText, setActivityText] = useState('')
 
-  const { data: projectLogs = [], isLoading: logsLoading } = useQuery({
+  const { data: projectLogs = EMPTY_ARR, isLoading: logsLoading } = useQuery({
     queryKey: ['projectLogs', projectFilter],
     queryFn:  () => getProjectLogs(Number(projectFilter)),
     enabled:  !!projectFilter,
@@ -515,7 +522,8 @@ export default function Tasks() {
   // Sync local order; auto-select first page on first load
   useEffect(() => {
     if (dragPageId !== null) return
-    setLocalNotes(notes)
+    // Guard: skip update when both are empty to prevent render loops from unstable [] references
+    setLocalNotes(prev => (prev.length === 0 && notes.length === 0 ? prev : notes))
     if (notes.length > 0 && !selectedPageId) {
       setSelectedPageId(notes[0].id)
       setPageTitle(notes[0].title)

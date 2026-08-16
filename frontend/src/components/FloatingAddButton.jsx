@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, X, ListTodo, StickyNote } from 'lucide-react'
+import { Plus, X, ListTodo, StickyNote, PenLine } from 'lucide-react'
 import { createTask } from '../api/tasks'
 import { createNote } from '../api/notes'
 import { getProjects } from '../api/projects'
 import { useSettings } from '../context/SettingsContext'
+import { useQuickMemo } from '../context/QuickMemoContext'
 
 const TRAY_PROJECT_ID = 11
 
@@ -34,6 +35,7 @@ export default function FloatingAddButton() {
   const [searchParams] = useSearchParams()
   const { settings }   = useSettings()
   const qc             = useQueryClient()
+  const { openPanel }  = useQuickMemo()
 
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: getProjects })
   const nonTrayProjects = projects.filter(p => p.id !== TRAY_PROJECT_ID)
@@ -203,6 +205,10 @@ export default function FloatingAddButton() {
             <button className={optionBtn} onClick={() => open('note')}>
               <StickyNote size={13} className="text-violet-400 shrink-0" />
               Add Note
+            </button>
+            <button className={optionBtn} onClick={() => { setExpanded(false); openPanel() }}>
+              <PenLine size={13} className="text-amber-400 shrink-0" />
+              Quick Memo
             </button>
           </>
         )}
