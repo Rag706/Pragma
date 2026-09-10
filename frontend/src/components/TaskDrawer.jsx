@@ -59,8 +59,18 @@ export default function TaskDrawer({ task, onClose, onDeleted, noBackdrop = fals
   // That is exactly the reported bug: text typed into one task's notes ended
   // up saved under the next task selected, and the original task's notes
   // were left empty.
+  //
+  // Also reset any other per-task input drafts here. `logText` (the Activity
+  // tab's unsent log draft) is otherwise never cleared on task switch, so a
+  // draft typed for task A would still be sitting in the box after switching
+  // to task B — submitting it would create a log entry under B with content
+  // meant for A. ChecklistField / LinksField have the equivalent problem
+  // with their own new-item drafts; those are fixed separately by keying
+  // them on task id (see `key={form.id}` below), which resets all of their
+  // internal draft state on switch.
   if (task !== lastTask) {
     setLastTask(task)
+    setLogText('')
     if (task) {
       setForm({ ...task })
       setActiveTab('details')
@@ -337,7 +347,10 @@ export default function TaskDrawer({ task, onClose, onDeleted, noBackdrop = fals
               placeholder="Task title…"
             />
             <div className="border-t border-zinc-800/60 pt-4">
-              <ChecklistField taskId={form.id} initialItems={form.checklist_items ?? []} />
+              {/* key={form.id}: force a fresh instance per task so any
+                  in-progress "new item" draft doesn't survive a task switch
+                  and get submitted under the wrong task. */}
+              <ChecklistField key={form.id} taskId={form.id} initialItems={form.checklist_items ?? []} />
             </div>
             <div className="border-t border-zinc-800/60 pt-4">
               <div className="mb-2"><SectionHeader icon={<AlignLeft size={11} />}>Notes</SectionHeader></div>
@@ -356,13 +369,15 @@ export default function TaskDrawer({ task, onClose, onDeleted, noBackdrop = fals
                 value={form.details ?? ''}
                 onChange={e => setForm(f => ({ ...f, details: e.target.value }))}
                 onBlur={handleDetailsBlur}
-                rows={4}
+                rows={8}
                 placeholder="上司からの指示・背景・経緯など参考情報を記載…"
-                className={`${fieldCls} resize-none text-zinc-400`}
+                className={`${fieldCls} resize-y text-zinc-400`}
               />
             </div>
             <div className="border-t border-zinc-800/60 pt-4">
-              <LinksField taskId={form.id} initialLinks={form.links ?? []} />
+              {/* Same reasoning as ChecklistField above — reset any
+                  in-progress "add link" draft on task switch. */}
+              <LinksField key={form.id} taskId={form.id} initialLinks={form.links ?? []} />
             </div>
             <div className="pb-2">
               <p className="text-[10px] text-zinc-700">
@@ -584,7 +599,7 @@ export default function TaskDrawer({ task, onClose, onDeleted, noBackdrop = fals
                 </Field>
 
                 {form.project_id && (
-                  <TagsField taskId={form.id} projectId={form.project_id} currentTags={form.tags ?? []} />
+                  <TagsField key={form.id} taskId={form.id} projectId={form.project_id} currentTags={form.tags ?? []} />
                 )}
 
                 <Field icon={<Layers size={13} />} label="Project">
@@ -675,20 +690,25 @@ export default function TaskDrawer({ task, onClose, onDeleted, noBackdrop = fals
                   value={form.details ?? ''}
                   onChange={(e) => setForm((f) => ({ ...f, details: e.target.value }))}
                   onBlur={handleDetailsBlur}
-                  rows={4}
+                  rows={8}
                   placeholder="上司からの指示・背景・経緯など参考情報を記載…"
-                  className={`${fieldCls} resize-none text-zinc-400`}
+                  className={`${fieldCls} resize-y text-zinc-400`}
                 />
               </div>
 
               {/* Checklist */}
               <div className="border-t border-zinc-800 pt-4">
-                <ChecklistField taskId={form.id} initialItems={form.checklist_items ?? []} />
+                {/* key={form.id}: force a fresh instance per task so any
+                  in-progress "new item" draft doesn't survive a task switch
+                  and get submitted under the wrong task. */}
+              <ChecklistField key={form.id} taskId={form.id} initialItems={form.checklist_items ?? []} />
               </div>
 
               {/* Links */}
               <div className="border-t border-zinc-800 pt-4">
-                <LinksField taskId={form.id} initialLinks={form.links ?? []} />
+                {/* Same reasoning as ChecklistField above — reset any
+                  in-progress "add link" draft on task switch. */}
+              <LinksField key={form.id} taskId={form.id} initialLinks={form.links ?? []} />
               </div>
             </div>
             )}
