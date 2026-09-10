@@ -31,9 +31,10 @@ const fieldCls =
   'focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all'
 
 export default function TaskDrawer({ task, onClose, onDeleted, noBackdrop = false, inline = false }) {
-  const [form, setForm] = useState(null)
+  const [form, setForm] = useState(task ? { ...task } : null)
   const [activeTab, setActiveTab] = useState('details')
   const [logText, setLogText] = useState('')
+  const [lastTask, setLastTask] = useState(task)
   const qc = useQueryClient()
   const logInputRef    = useRef(null)
   const remindInputRef = useRef(null)
@@ -47,9 +48,26 @@ export default function TaskDrawer({ task, onClose, onDeleted, noBackdrop = fals
     enabled: !!task?.id,
   })
 
-  useEffect(() => {
-    if (task) { setForm({ ...task }); setActiveTab('details') }
-  }, [task])
+  // Sync `form` to the selected task SYNCHRONOUSLY during render (React's
+  // documented "adjust state while rendering" pattern) instead of via a
+  // useEffect. An effect runs strictly after commit, so for one render pass
+  // `task` would already point at the newly selected task while `form` still
+  // held the PREVIOUS task's buffered (possibly unsaved) edits. The notes
+  // editor below is remounted per task via `key={task?.id}`; if that remount
+  // happened in that stale render, the new editor would initialize with the
+  // previous task's notes (TipTap's `content` prop is only read on mount).
+  // That is exactly the reported bug: text typed into one task's notes ended
+  // up saved under the next task selected, and the original task's notes
+  // were left empty.
+  if (task !== lastTask) {
+    setLastTask(task)
+    if (task) {
+      setForm({ ...task })
+      setActiveTab('details')
+    } else {
+      setForm(null)
+    }
+  }
 
   const saveMutation = useMutation({
     mutationFn: ({ id, ...data }) => updateTask(id, data),
